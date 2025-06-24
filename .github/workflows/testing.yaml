@@ -171,13 +171,6 @@ jobs:
           name: coverage-output-e2e
           path: coverage-output-e2e
         if: ${{ matrix.kubernetes.latest }}
-    needs:
-    with:
-    permissions:
-    uses:
-    if:
-    secrets:
-    concurrency:
 
   coverage-process:
     name: Process Coverage Files
