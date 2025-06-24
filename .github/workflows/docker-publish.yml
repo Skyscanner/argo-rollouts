@@ -72,8 +72,10 @@ jobs:
       platforms: ${{ needs.set-vars.outputs.platforms }}
       push: ${{ github.event_name != 'pull_request' }}
     secrets:
-      quay_username: ${{ secrets.QUAY_USERNAME }}
-      quay_password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+      #quay_username: ${{ secrets.RELEASE_QUAY_USERNAME }}
+      #quay_password: ${{ secrets.RELEASE_QUAY_TOKEN }}
+      ghcr_username: ${{ github.actor }}
+      ghcr_password: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-push-plugin-image:
     needs: [set-vars]
@@ -90,5 +92,7 @@ jobs:
       push: ${{ github.event_name != 'pull_request' }}
       target: kubectl-argo-rollouts
     secrets:
-      quay_username: ${{ secrets.QUAY_USERNAME }}
-      quay_password: ${{ secrets.QUAY_ROBOT_TOKEN }}
+      #quay_username: ${{ secrets.RELEASE_QUAY_USERNAME }}
+      #quay_password: ${{ secrets.RELEASE_QUAY_TOKEN }}
+      ghcr_username: ${{ github.actor }}
+      ghcr_password: ${{ secrets.GITHUB_TOKEN }}
