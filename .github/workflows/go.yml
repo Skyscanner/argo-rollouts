@@ -14,6 +14,7 @@ on:
       - skyscanner-internal/master
       # Cleaned up, ready for contribution PRs are to be cherry-picked here
       - skyscanner-contrib/master
+    types: [labeled, unlabeled, opened, synchronize, reopened]
 
 #on:
 #  push:
