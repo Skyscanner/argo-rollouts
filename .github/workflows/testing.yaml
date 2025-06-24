@@ -15,7 +15,7 @@ on:
       - skyscanner-internal/master
       # Cleaned up, ready for contribution PRs are to be cherry-picked here
       - skyscanner-contrib/master
-    types: [labeled, unlabeled, opened, synchronize, reopened]
+    types: [ labeled, unlabeled, opened, synchronize, reopened ]
 #  push:
 #    branches:
 #      - 'master'
@@ -53,7 +53,7 @@ jobs:
           path: ${{ github.event_path }}
   test-unit:
     name: Run unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-large
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5.4.0
@@ -103,7 +103,7 @@ jobs:
           - version: '1.31'
             latest: true
     name: Run end-to-end tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-xlarge
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5.4.0
@@ -134,13 +134,13 @@ jobs:
           kubectl apply -f  test/e2e/crds
       - name: Start controller
         run: make start-e2e 2>&1 | sed -r "s/[[:cntrl:]]\[[0-9]{1,3}m//g" > /tmp/e2e-controller.log &
-#      - name: Setup tmate session
-#        uses: mxschmitt/action-tmate@v3
-#        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true'}}
+      #      - name: Setup tmate session
+      #        uses: mxschmitt/action-tmate@v3
+      #        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true'}}
       - name: Run e2e tests
         run: |
           make test-e2e
-#        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true') }}
+      #        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true') }}
       - name: Stop e2e tests controller
         run: |
           pgrep -f go-build -a
@@ -148,7 +148,7 @@ jobs:
           sleep 5
           echo "done stopping process"
           ls -lah coverage-output-e2e/
-#        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true' && matrix.kubernetes.latest)}}
+      #        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true' && matrix.kubernetes.latest)}}
       - name: Output Rerun Overview
         run: |
           [[ -f rerunreport.txt ]] && cat rerunreport.txt || echo "No rerun report found"
@@ -171,6 +171,13 @@ jobs:
           name: coverage-output-e2e
           path: coverage-output-e2e
         if: ${{ matrix.kubernetes.latest }}
+    needs:
+    with:
+    permissions:
+    uses:
+    if:
+    secrets:
+    concurrency:
 
   coverage-process:
     name: Process Coverage Files
