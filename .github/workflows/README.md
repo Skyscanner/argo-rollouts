@@ -2,7 +2,6 @@
 
 | Workflow            | Description                                                     |
 |---------------------|-----------------------------------------------------------------|
-| changelog.yml       | Updates changelog when a release is published                   |
 | docker-publish.yaml | Build container image for PR's & publish for push events        |
 | image-reuse.yaml    | Build, push, and Sign container images                          |
 | go.yaml             | lint, build, codegen                                            |

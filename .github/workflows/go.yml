@@ -2,12 +2,28 @@ name: Go
 on:
   push:
     branches:
-#      - 'master'
-#      - 'release-*'
-      - 'test-ci'
+      # We use skyscanner-internal/master as the base branch for integration
+      # This branch contains our CI changes and is not meant for direct contributions.
+      # Our internal development is to be merged into here.
+      # The changes that are ready for contribution should be cherry-picked to skyscanner-contrib/master.
+      - skyscanner-internal/master
+      # Branches to be used for development and testing. They should be based on skyscanner-internal/master.
+      - skyscanner-internal/develop/**
   pull_request:
     branches:
-      - 'master'
+      - skyscanner-internal/master
+      # Cleaned up, ready for contribution PRs are to be cherry-picked here
+      - skyscanner-contrib/master
+
+#on:
+#  push:
+#    branches:
+#      - 'master'
+#      - 'release-*'
+#  pull_request:
+#    branches:
+#      - 'master'
+
 env:
   # Golang version to use across CI steps
   GOLANG_VERSION: '1.23'
@@ -40,7 +56,7 @@ jobs:
           args: --timeout 6m
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-medium
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5.4.0
@@ -66,7 +82,7 @@ jobs:
 
   codegen:
     name: Verify Codegen
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-medium
     env:
       GOPATH: /home/runner/go
     steps:
