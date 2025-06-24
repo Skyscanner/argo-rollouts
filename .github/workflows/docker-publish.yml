@@ -32,7 +32,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            quay.io/argoproj/argo-rollouts
+            ghcr.io/skyscanner/argo-rollouts
           tags: |
             type=ref,event=branch,enable=${{ github.ref != 'refs/heads/master'}}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
@@ -42,7 +42,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            quay.io/argoproj/kubectl-argo-rollouts
+            ghcr.io/skyscanner/kubectl-argo-rollouts
           tags: |
             type=ref,event=branch,enable=${{ github.ref != 'refs/heads/master'}}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
@@ -67,7 +67,7 @@ jobs:
     uses: ./.github/workflows/image-reuse.yaml
     with:
       # quay_image_name: ${{ needs.set-vars.outputs.controller-meta-tags }}
-      ghcr_image_name: ${{ needs.set-vars.outputs.controller-meta-tags }}
+      ghcr_image_name: ghcr.io/skyscanner/argo:${{ needs.set-vars.outputs.controller-meta-tags }}
       # Note: cannot use env variables to set go-version (https://docs.github.com/en/actions/using-workflows/reusing-workflows#limitations)
       go-version: '1.23'
       platforms: ${{ needs.set-vars.outputs.platforms }}
