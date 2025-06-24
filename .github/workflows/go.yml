@@ -2,8 +2,9 @@ name: Go
 on:
   push:
     branches:
-      - 'master'
-      - 'release-*'
+#      - 'master'
+#      - 'release-*'
+      - 'test-ci'
   pull_request:
     branches:
       - 'master'
