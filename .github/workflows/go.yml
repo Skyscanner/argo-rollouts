@@ -57,7 +57,7 @@ jobs:
           args: --timeout 6m
   build:
     name: Build
-    runs-on: ubuntu-latest-medium
+    runs-on: ubuntu-24.04-8cores-public
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5.4.0
@@ -83,7 +83,7 @@ jobs:
 
   codegen:
     name: Verify Codegen
-    runs-on: ubuntu-latest-medium
+    runs-on: ubuntu-24.04-8cores-public
     env:
       GOPATH: /home/runner/go
     steps:
