@@ -43,6 +43,16 @@ jobs:
       platforms: ${{ steps.platform-matrix.outputs.platform-matrix }}
 
     steps:
+      - name: configure tags
+        id: image-tag
+        run: |
+          # Get the branch name
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          # Sanitize branch name for container registry compliance
+          SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed -e 's/\//-/g' | tr '[:upper:]' '[:lower:]')
+          # Set the image tag with sanitized branch name
+          echo "tag=${SANITIZED_BRANCH}-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
       - name: Docker meta (controller)
         id: controller-meta
         uses: docker/metadata-action@v5
@@ -50,8 +60,9 @@ jobs:
           images: |
             ghcr.io/skyscanner/argo-rollouts
           tags: |
-            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/master'}}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ steps.image-tag.outputs.tag }}
+#            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/master'}}
+#            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
       - name: Docker meta (plugin)
         id: plugin-meta
@@ -60,8 +71,9 @@ jobs:
           images: |
             ghcr.io/skyscanner/kubectl-argo-rollouts
           tags: |
-            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/master'}}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ steps.image-tag.outputs.tag }}
+#            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/master'}}
+#            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
       # avoid building linux/arm64 for PRs since it takes so long
       - name: Set Platform Matrix
