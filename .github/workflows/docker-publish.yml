@@ -51,7 +51,7 @@ jobs:
           # Sanitize branch name for container registry compliance
           SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed -e 's/\//-/g' | tr '[:upper:]' '[:lower:]')
           # Set the image tag with sanitized branch name
-          echo "tag=$(cat ./VERSION)-${SANITIZED_BRANCH}-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "tag=${SANITIZED_BRANCH}-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
 
       - name: Docker meta (controller)
         id: controller-meta
