@@ -103,7 +103,7 @@ jobs:
           - version: '1.31'
             latest: true
     name: Run end-to-end tests
-    runs-on: ubuntu-24.04-8cores-public
+    runs-on: ubuntu-24.04-16cores-public
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5.4.0
