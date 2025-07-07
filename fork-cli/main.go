@@ -202,7 +202,7 @@ Commands:
     • --proposal-branch  short name under skyscanner-contrib/proposal/ (e.g. fix-issue-123)
     
   sync-fork
-    • Syncs both forks with upstream GitHub repository (argoproj/argo-cd)
+    • Syncs both forks with upstream GitHub repository (argoproj/argo-rollouts)
     • Rebases skyscanner-contrib/master on top of upstream/master
     • Rebases skyscanner-internal/master on top of skyscanner-contrib/master
 
@@ -348,7 +348,7 @@ func promoteFixCmd(args []string, runner CommandRunner) int {
 	fmt.Printf("✅ %s is ready for upstream contribution\n\n", proposalFull)
 	fmt.Println("Next steps:")
 	fmt.Printf("  git push origin %s\n", proposalFull)
-	fmt.Println("  # Then create a PR to argoproj/argo-cd:master from this branch")
+	fmt.Println("  # Then create a PR to argoproj/argo-rollouts:master from this branch")
 	return 0
 }
 
@@ -385,8 +385,8 @@ func syncForkCmd(args []string, runner CommandRunner) int {
 	}
 
 	if !hasUpstream {
-		fmt.Println("→ Adding upstream remote: https://github.com/argoproj/argo-cd.git")
-		runner.RunOrExit("git", "remote", "add", "upstream", "https://github.com/argoproj/argo-cd.git")
+		fmt.Println("→ Adding upstream remote: https://github.com/argoproj/argo-rollouts.git")
+		runner.RunOrExit("git", "remote", "add", "upstream", "https://github.com/argoproj/argo-rollouts.git")
 	}
 
 	// 2) Fetch from all remotes to ensure we have latest code
@@ -508,7 +508,7 @@ func workOnCmd(args []string, runner CommandRunner) int {
 	fmt.Println("Setting up default repo and creating PR...")
 
 	// Set default repo to fork (not upstream)
-	runner.RunOrExit("gh", "repo", "set-default", "Skyscanner/argo-cd")
+	runner.RunOrExit("gh", "repo", "set-default", "Skyscanner/argo-rollouts")
 
 	// Push the branch
 	runner.RunOrExit("git", "push", "-u", "origin", featureBranch)

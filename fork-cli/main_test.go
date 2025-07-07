@@ -376,7 +376,7 @@ func TestSyncForkCmd(t *testing.T) {
 
 		// Setup mock commands for successful execution with adding upstream
 		mock.ExpectCommand("git", "remote").WithOutput("origin")
-		mock.ExpectCommand("git", "remote", "add", "upstream", "https://github.com/argoproj/argo-cd.git")
+		mock.ExpectCommand("git", "remote", "add", "upstream", "https://github.com/argoproj/argo-rollouts.git")
 		mock.ExpectCommand("git", "fetch", "--all")
 		mock.ExpectCommand("git", "checkout", "skyscanner-contrib/master")
 		mock.ExpectCommand("git", "rebase", "upstream/master")
@@ -456,7 +456,7 @@ func TestWorkOnCmd(t *testing.T) {
 		mock.ExpectCommand("sh", "-c", "echo 'v2.14.9-add-logging' > VERSION")
 		mock.ExpectCommand("git", "add", "VERSION")
 		mock.ExpectCommand("git", "commit", "-m", "feat: add-logging\n\nUpdate VERSION to v2.14.9-add-logging")
-		mock.ExpectCommand("gh", "repo", "set-default", "Skyscanner/argo-cd")
+		mock.ExpectCommand("gh", "repo", "set-default", "Skyscanner/argo-rollouts")
 		mock.ExpectCommand("git", "push", "-u", "origin", "skyscanner-internal/develop/v2.14.9/fix-issue-123-add-logging")
 		mock.ExpectCommand("gh", "pr", "create", "--base", "skyscanner-internal/develop/v2.14.9/fix-issue-123", "--title", "feat: add-logging", "--body", "Automated PR created via fork-cli\n\nUpdates VERSION to v2.14.9-add-logging")
 

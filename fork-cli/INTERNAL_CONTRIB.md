@@ -1,16 +1,16 @@
-# Fork CLI: ArgoCD Internal Contribution Guide
+# Fork CLI: argo-rollouts Internal Contribution Guide
 
-This guide explains how to work with our ArgoCD fork at Skyscanner. There are two main workflows:
+This guide explains how to work with our argo-rollouts fork at Skyscanner. There are two main workflows:
 
 1. **Internal Development** - Developing fixes/features for internal use at Skyscanner
-2. **Upstream Contribution** - Contributing our changes back to ArgoCD upstream
+2. **Upstream Contribution** - Contributing our changes back to argo-rollouts upstream
 
 ## Branch Structure
 
 Our fork maintains several important branches:
 
 - **`skyscanner-internal/master`**
-  - Default branch of our fork (`skyscanner/argo-cd`)
+  - Default branch of our fork (`skyscanner/argo-rollouts`)
   - Contains latest upstream code + Skyscanner CI files
   - Should contain minimal changes (mainly CI/build configs and tooling)
   - Updated by rebasing onto `skyscanner-contrib/master`
@@ -22,7 +22,7 @@ Our fork maintains several important branches:
   - Contains our CI folder copied from `skyscanner-internal/master` and fork tooling
 
 - **`skyscanner-contrib/master`**
-  - Mirror of `argoproj/argo-cd:master`
+  - Mirror of `argoproj/argo-rollouts:master`
   - Never push to this directly
 
 - **`skyscanner-contrib/proposal/<proposal-name>`**
@@ -50,8 +50,8 @@ Our fork maintains several important branches:
    This ensures both `skyscanner-contrib/master` and `skyscanner-internal/master` are up to date.
 
 3. **Check if the issue/feature already exists**:
-   - Verify latest ArgoCD releases at https://github.com/argoproj/argo-cd/releases
-   - Check ArgoCD issue tracker: https://github.com/argoproj/argo-cd/issues
+   - Verify latest argo-rollouts releases at https://github.com/argoproj/argo-rollouts/releases
+   - Check argo-rollouts issue tracker: https://github.com/argoproj/argo-rollouts/issues
    - Consider coordinating with upstream maintainers for major changes
 
 ### Starting Development
@@ -77,7 +77,7 @@ Our fork maintains several important branches:
 
 3. **Make changes and create PRs**:
    - Make changes, commit, and push your feature branch
-      - Skim through argocd [contribution guide](https://argo-cd.readthedocs.io/en/latest/developer-guide/code-contributions/)
+      - Skim through argo-rollouts [contribution guide](https://argo-rollouts.readthedocs.io/en/stable/CONTRIBUTING/)
       - run `make pre-commit-local` to run pre commit checks (it's slow)
       - make sure **all** commit messages follow the pattern `^(feat|fix|docs|test|ci|chore)!?(\\(.*\\))?!?:.*`
    - Create PRs against the development branch (not upstream!)
@@ -108,9 +108,9 @@ Our fork maintains several important branches:
    - In CI mode, it will tell you to run the command locally
    - Follow instructions to fix conflicts and continue
 
-3. **Create a PR to upstream ArgoCD**:
+3. **Create a PR to upstream argo-rollouts**:
    - Push the proposal branch: `git push origin skyscanner-contrib/proposal/proposal-name`
-   - Create PR to `argoproj/argo-cd:master` from the proposal branch
+   - Create PR to `argoproj/argo-rollouts:master` from the proposal branch
    - Reference the related issue number (e.g., "Fixes #123")
    - Provide clear description of changes
 
