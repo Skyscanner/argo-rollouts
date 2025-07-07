@@ -78,7 +78,7 @@ Our fork maintains several important branches:
 3. **Make changes and create PRs**:
    - Make changes, commit, and push your feature branch
       - Skim through argo-rollouts [contribution guide](https://argo-rollouts.readthedocs.io/en/stable/CONTRIBUTING/)
-      - run `make pre-commit-local` to run pre commit checks (it's slow)
+      - run `make lint` to run lint checks
       - make sure **all** commit messages follow the pattern `^(feat|fix|docs|test|ci|chore)!?(\\(.*\\))?!?:.*`
    - Create PRs against the development branch (not upstream!)
    - Use the `gh` CLI for convenience:
