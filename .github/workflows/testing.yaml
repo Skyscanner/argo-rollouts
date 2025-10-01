@@ -3,14 +3,33 @@ name: Testing
 on:
   push:
     branches:
-      - 'master'
-      - 'release-*'
+      # We use skyscanner-internal/master as the base branch for integration
+      # This branch contains our CI changes and is not meant for direct contributions.
+      # Our internal development is to be merged into here.
+      # The changes that are ready for contribution should be cherry-picked to skyscanner-contrib/master.
+      - skyscanner-internal/master
+      # Branches to be used for development and testing. They should be based on skyscanner-internal/master.
+      - skyscanner-internal/develop/**
   pull_request:
     branches:
-      - 'master'
-      - 'release-*'
-  workflow_dispatch:
-
+      - skyscanner-internal/master
+      # Cleaned up, ready for contribution PRs are to be cherry-picked here
+      - skyscanner-contrib/master
+    types: [ labeled, unlabeled, opened, synchronize, reopened ]
+#  push:
+#    branches:
+#      - 'master'
+#      - 'release-*'
+#  pull_request:
+#    branches:
+#      - 'master'
+#      - 'release-*'
+#  workflow_dispatch:
+#    inputs:
+#      debug_enabled:
+#        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+#        required: false
+#        default: false
 env:
   # Golang version to use across CI steps
   GOLANG_VERSION: '1.24'
@@ -34,7 +53,7 @@ jobs:
           path: ${{ github.event_path }}
   test-unit:
     name: Run unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-8cores-public
     steps:
       - name: Set up Go
         uses: actions/setup-go@v6.0.0
@@ -84,7 +103,7 @@ jobs:
           - version: '1.34'
             latest: true
     name: Run end-to-end tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-16cores-public
     steps:
       - name: Set up Go
         uses: actions/setup-go@v6.0.0
@@ -118,7 +137,7 @@ jobs:
       - name: Run e2e tests
         run: |
           make test-e2e
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true') }}
+      #        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true') }}
       - name: Stop e2e tests controller
         run: |
           pgrep -f go-build -a
@@ -126,7 +145,7 @@ jobs:
           sleep 5
           echo "done stopping process"
           ls -lah coverage-output-e2e/
-        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true' && matrix.kubernetes.latest)}}
+      #        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled == 'true' && matrix.kubernetes.latest)}}
       - name: Output Rerun Overview
         run: |
           [[ -f rerunreport.txt ]] && cat rerunreport.txt || echo "No rerun report found"
