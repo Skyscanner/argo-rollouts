@@ -233,4 +233,24 @@ Update istio traffic shifting to the previous replicaset and scaledown the curre
 Outcome
 Hard to reproduce, slingshot is too slow to do it in 30s, we may need to specify scaleDown explicitly and put it to a much longer window i.e 10 minutes. Doing it from argocd seems to work
 
+## Additional Log Analysis - Missing Piece
+
+### Rollback Window Log Investigation
+
+**Query:** `WITH aparse(message, '%Rollback * window%') as rollback SELECT count(*) FROM Log WHERE message LIKE '%rollback % window%' AND cluster_name = 'cellsdev-2-eu-central-1a-1' SINCE 6 hours ago FACET rollback`
+
+**Results:**
+- "within the window": 40 occurrences
+- "within window": 4 occurrences  
+- "outside the window": 0 occurrences
+
+**Critical Finding:** 
+- ALL rollbacks detected were "within the window" according to logs
+- Yet analysis runs still occurred in some cases
+- This suggests the rollback window logic is working correctly for detection
+- But analysis skipping is failing due to OTHER conditions
+
+**Implication:**
+The inconsistent behavior is NOT due to window calculation failures, but due to other conditions in the analysis skipping logic that override the rollback window detection.
+
 
