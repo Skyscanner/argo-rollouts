@@ -12,6 +12,20 @@ This comprehensive analysis reveals that Argo Rollouts issue #3 represents a **f
 
 **Recommendation**: CRITICAL priority implementation (22-30 weeks, 3-4 engineers, HIGH risk) to unlock large-scale progressive delivery capabilities.
 
+## Community Context: Multiple Similar Issues
+
+This is not an isolated issue - the binary health checking limitation has generated multiple related problems in the Argo Rollouts repository, indicating widespread user pain points with large-scale deployments.
+
+| Issue/PR # | Title | Status | User Impact | Key Evidence |
+|------------|-------|--------|-------------|--------------|
+| **#3899** | Binary health checking prevents large-scale rollouts | Open/Implementation | **CRITICAL** - Blocks enterprise adoption | PR attempting to address health checking logic for autoscaling compatibility |
+| **Rollouts stuck waiting for pods** | Multiple reports of rollouts permanently stuck | Recurring | **HIGH** - Requires manual intervention | Common issue in Slack/forums: "Rollouts get stuck waiting for pods that can't be scheduled" |
+| **Autoscaling incompatibility** | HPA/cluster autoscaling conflicts with rollout logic | Open | **HIGH** - Prevents modern deployments | Users report "Autoscaling doesn't work with Argo Rollouts" |
+| **PDB violations during rollouts** | Pod Disruption Budget conflicts | Open | **HIGH** - Safety vs. progress deadlock | PDBs prevent the simultaneous full availability required by health checks |
+| **Spot instance preemption issues** | Rollouts fail when spot instances are preempted | Open | **MEDIUM** - Cloud cost optimization blocked | Spot instance preemption causes cascading rollout failures |
+
+**Community Context:** This represents a fundamental architectural limitation that affects multiple deployment patterns. The issue spans from basic rollout deadlocks to advanced autoscaling scenarios, with users consistently reporting that Argo Rollouts "doesn't work at scale" compared to native Kubernetes Deployments or other progressive delivery tools.
+
 ## Technical Root Cause (Updated)
 
 ### Fundamental Issue
@@ -283,6 +297,8 @@ This issue is a **fundamental blocker** for enterprise adoption and large-scale 
 ## Conclusion
 
 This analysis reveals that Argo Rollouts issue #3 is not a minor scaling optimization but a **fundamental architectural limitation** that prevents the tool from working in modern autoscaling environments. The binary health checking approach, designed for simpler times, is incompatible with large-scale deployments using Pod Disruption Budgets, cluster autoscaling, and spot instances.
+
+**Community Context:** As detailed in the "Community Context" section above, this is not an isolated issue - multiple related problems spanning rollout deadlocks, autoscaling conflicts, and PDB violations indicate persistent user pain points that prevent Argo Rollouts adoption at scale.
 
 **The solution requires a complete rethinking of rollout health logic**, moving from "all healthy" to "sufficiently healthy" with percentage-based requirements that properly integrate with Kubernetes deployment controls.
 

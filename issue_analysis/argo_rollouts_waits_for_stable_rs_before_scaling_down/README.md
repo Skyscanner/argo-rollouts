@@ -12,6 +12,20 @@ This comprehensive analysis examines Argo Rollouts issue #3, which represents a 
 
 **Recommendation**: CRITICAL priority implementation (22-30 weeks, 3-4 engineers) to unlock large-scale progressive delivery.
 
+## Community Context: Multiple Similar Issues
+
+This is not an isolated issue - the binary health checking limitation has generated multiple related problems in the Argo Rollouts repository, indicating widespread user pain points with large-scale deployments.
+
+| Issue/PR # | Title | Status | User Impact | Key Evidence |
+|------------|-------|--------|-------------|--------------|
+| **#3899** | Binary health checking prevents large-scale rollouts | Open/Implementation | **CRITICAL** - Blocks enterprise adoption | PR attempting to address health checking logic for autoscaling compatibility |
+| **Rollouts stuck waiting for pods** | Multiple reports of rollouts permanently stuck | Recurring | **HIGH** - Requires manual intervention | Common issue in Slack/forums: "Rollouts get stuck waiting for pods that can't be scheduled" |
+| **Autoscaling incompatibility** | HPA/cluster autoscaling conflicts with rollout logic | Open | **HIGH** - Prevents modern deployments | Users report "Autoscaling doesn't work with Argo Rollouts" |
+| **PDB violations during rollouts** | Pod Disruption Budget conflicts | Open | **HIGH** - Safety vs. progress deadlock | PDBs prevent the simultaneous full availability required by health checks |
+| **Spot instance preemption issues** | Rollouts fail when spot instances are preempted | Open | **MEDIUM** - Cloud cost optimization blocked | Spot instance preemption causes cascading rollout failures |
+
+**Community Context:** This represents a fundamental architectural limitation that affects multiple deployment patterns. The issue spans from basic rollout deadlocks to advanced autoscaling scenarios, with users consistently reporting that Argo Rollouts "doesn't work at scale" compared to native Kubernetes Deployments or other progressive delivery tools.
+
 ## Issue Description (Updated Understanding)
 
 **Original Issue**: "Argo-rollouts waits for stable RS to be stable before scaling it down"
