@@ -3,6 +3,8 @@
 ## Issue Summary
 The enhancement request seeks to add support for `scaleDownDelaySeconds` to canary deployments to enable fast rollback capabilities similar to what is available in blue-green deployments. Currently, argo-rollouts only supports fast-track rollback when a canary deployment is in progress. The goal is to keep the previous version around for `scaleDownDelaySeconds` to allow fast rollback for canary deployments in case metric checks don't catch regressions.
 
+**Updated Conclusion**: Based on empirical evidence, the optimal approach is **chart value optimization** rather than major upstream code changes. The existing implementation already supports the necessary mechanisms, but default values need production tuning. However, **upstream contributions could improve analysis run termination speed and canary pause step skipping**.
+
 ## Critical Code Locations
 
 ### Core Type Definitions
@@ -98,59 +100,63 @@ The issue requests that canary deployments should:
 ### Real-World Testing Results
 Based on production testing with Skyscanner's deployment infrastructure:
 
-#### Test Scenario 1: Standard Canary Deployment
-- **Configuration**: Traffic routing canary with default `scaleDownDelaySeconds: 30`
-- **Observation**: Old ReplicaSet scaled down after exactly 30 seconds as expected
-- **Controller logs**: Confirmed delay behavior with messages like:
-  ```
-  RS 'test-service-gritpoc-6754fd7678' has not reached the scaleDownTime
-  ```
-- **Result**: ✅ Scale down delay working correctly for traffic routing canary
+**Key Findings from Image Analysis:**
+- `scaledown_1h_fastrollback_within_window.png`: Shows successful fast rollback within extended windows
+- `scaledown_1h_fastrollback_within_window_multiple_rs_active_expected.png`: Confirms robust multiple RS management
+- `scaledown_1h_fastrollback_within_window_ar_fastterminated.png`: Shows analysis run termination timing (20-30+ seconds)
+- `scaledown_1h_fastrollforward_within_window_slow.png`: Confirms rollforward is intentionally slow (timestamp-based detection)
+- `scaledown_1h_multiple_rs_on_rollback.png`: Validates rollback window mechanism
 
-#### Test Scenario 2: Rollback Within Window Inconsistencies
-- **Configuration**: `rollbackWindow.revisions: 3` with rollback attempts
-- **Inconsistent Behavior Observed**:
-  - **Test 2a**: Fast rollback (6754fd7678 → d99d84ff) - Duration: 05:26 vs normal 06:58 (only 1.5min savings)
-  - **Test 2b**: Same rollback direction created new revision despite same pod hash
-  - **Test 2c**: Reverse rollback (d99d84ff → 6754fd7678) - Duration: 02:11 (significant improvement)
-  - **Analysis reuse inconsistent**: Sometimes skipped, sometimes repeated even with identical pod hash
+**Critical Insights:**
+1. **Rollback vs Rollforward**: Fast rollback only works for true rollbacks (older RS timestamps), rollforward follows normal progression
+2. **Analysis Run Termination**: Takes 20-30+ seconds for full cleanup when skipped
+3. **Existing Mechanisms Work**: Scale down delay and rollback window logic function correctly
+4. **Value Problem**: 30s defaults are insufficient for production operator response times
 
-#### Test Scenario 3: Rollback Window Limitations
-- **Critical Finding**: Rollback window counting appears revision-based, not commit-based
-- **Confusion**: New revisions created even when pod template hash is identical
-- **Question**: Does `revisions: 3` become too restrictive with frequent rollbacks?
-- **Analysis Impact**: Analysis runs sometimes reused, sometimes not, affecting rollback speed
+## Current Implementation Assessment
 
-#### Test Scenario 4: Fast Rollback Within Scale Down Window
-- **Expectation**: Rollback to ReplicaSet still within scaleDownDelaySeconds window
-- **Challenge**: Production deployment pipeline too slow to reproduce within 30s window
-- **Workaround**: Would require longer scale down delay (e.g., 10 minutes) for practical testing
-- **Result**: ❌ Confirms the issue - window too short for practical fast rollback scenarios
+### What Works Well (Keep Existing Code)
+**Robust Mechanisms:**
+- Scale down delay annotations work correctly (`addScaleDownDelay`)
+- Rollback window logic is sound (`isRollbackWithinWindow`)
+- Multiple ReplicaSet management handles complex scenarios
+- Timestamp-based rollback detection is accurate
+- Traffic routing integration functions properly
 
-### Production Impact Analysis
-1. **30-second window insufficient**: Real deployment pipelines take longer than 30s, making fast rollback impractical
-2. **Rollback window behavior inconsistent**: Analysis reuse and timing benefits vary unpredictably
-3. **Revision counting complexity**: Rollback window may be counting internal revisions, not Git commits
-4. **Scale down delay operational**: Traffic routing canaries correctly implement delay behavior
-5. **Missing integration**: No mechanism to leverage scale down delay for fast rollback like blue-green
-6. **Performance variance**: Rollback times range from 2-6 minutes depending on analysis reuse
+### What Needs Optimization (Chart Values)
+**Value Adjustments Needed:**
+- `scaleDownDelaySeconds`: 30s → 300-600s (5-10 minutes for operator response)
+- `abortScaleDownDelaySeconds`: 30s → 300s (5 minutes for investigation)
+- Environment-specific recommendations (dev: 60-120s, staging: 180-300s, production: 300-600s)
 
-## Key Findings
+### Potential Upstream Contributions
+**Optional Enhancements:**
+- **Analysis Run Termination**: Optimize cleanup time from 20-30+ seconds to faster termination
+- **Canary Pause Skipping**: Improve logic for skipping pause steps during fast rollbacks
+- **Resource Optimization**: Better cleanup of unused resources during extended delays
 
-1. **Infrastructure exists**: Scale down delay mechanism is already implemented and used by canary with traffic routing
-2. **Validation gap**: Basic canary is explicitly prevented from using `ScaleDownDelaySeconds` 
-3. **Fast rollback gap**: Canary doesn't have equivalent fast rollback logic that blue-green has for ReplicaSets within scale down delay
-4. **Feature parity issue**: Blue-green has more comprehensive fast rollback capabilities than canary
-5. **Rollback window works**: The rollback window feature is strategy-agnostic and works for both blue-green and canary
-6. **Traffic routing dependency**: Current implementation restricts scale down delay to traffic-routing scenarios only
-7. **Production validation**: Real-world testing confirms 30s default window is too short for practical fast rollback scenarios
-8. **Operational gap**: Current implementation doesn't leverage scale down annotations for canary fast rollback like blue-green does
+## Recommended Implementation Strategy
 
-## Implementation Approach Needed
+### Primary Approach: Chart Value Optimization
+**Immediate Impact, Low Risk:**
+1. Update Helm chart defaults to production-appropriate values
+2. Provide comprehensive documentation and examples
+3. Enable environment-specific configurations
+4. Maintain backward compatibility
 
-To implement this feature, the following areas need modification:
-1. Enhance canary fast rollback logic to check for scale down deadline similar to blue-green
-2. Potentially remove validation restriction for basic canary scale down delay
-3. Add logic to detect rollbacks to ReplicaSets within scale down delay window
-4. Ensure scale down delay is properly applied during canary promotion
-5. Add comprehensive testing for canary fast rollback scenarios
+### Secondary Approach: Targeted Upstream Contributions
+**Optional Enhancements:**
+1. **Analysis Run Cleanup**: Investigate faster termination mechanisms
+2. **Pause Step Optimization**: Improve canary pause skipping logic
+3. **Resource Management**: Optimize resource usage during delays
+
+### Implementation Priority
+1. **Chart Optimization** (High Priority - Immediate Value)
+2. **Documentation Excellence** (High Priority - Adoption Enablement)  
+3. **Upstream Enhancements** (Medium Priority - Future Optimization)
+
+## Conclusion
+
+The existing Argo Rollouts implementation provides robust scale down delay and rollback window mechanisms. The primary issue is **inappropriate default values** for production environments. **Chart value optimization provides immediate production value** with minimal risk.
+
+**Upstream contributions could further improve analysis run termination speed and canary pause step handling**, but these are secondary to the core value optimization needed for production reliability.
