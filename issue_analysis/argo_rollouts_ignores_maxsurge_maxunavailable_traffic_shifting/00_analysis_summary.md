@@ -2,14 +2,14 @@
 
 ## Analysis Document Navigation
 
+- **[Analysis Summary](00_analysis_summary.md)** - Executive overview and key findings
 - **[Current State Analysis](01_current_state_analysis.md)** - Technical implementation details and code locations
 - **[Relevance Assessment](02_relevance_assessment.md)** - Issue validation and testing evidence
 - **[Historical Analysis](03_historical_analysis.md)** - Git blame, commit analysis, and design evolution
 - **[Upstream Analysis](04_upstream_analysis.md)** - Community issues, maintainer discussions, and similar patterns
 - **[Contribution Epic](05_contribution_epic.md)** - Implementation strategy and risk assessment
 - **[Effort Estimation](06_effort_estimation.md)** - Timeline and resource requirements
-- **[Analysis Summary](07_analysis_summary.md)** - Executive overview and key findings
-- **[Relative Interpretation Analysis](08_relative_interpretation_analysis.md)** - Alternative design approaches
+- **[Relative Interpretation Analysis](07_relative_interpretation_analysis.md)** - Alternative design approaches
 
 ---
 
@@ -17,6 +17,18 @@
 This analysis reveals that the omission of `maxSurge` and `maxUnavailable` support in traffic-routed canary deployments is **an intentional design decision**, not a bug or oversight. The Argo Rollouts maintainers deliberately prioritize traffic control over pod scaling limits, as evidenced by maintainer discussions in CNCF Slack and GitHub issue #2239.
 
 ## Key Findings
+
+### Functionality Matrix: Basic vs Traffic-Enabled Canaries
+
+| Feature | Basic Canary | Traffic-Enabled Canary | Notes |
+|---------|-------------|----------------------|-------|
+| **maxSurge/maxUnavailable** | ✅ **Supported** | ❌ **Ignored** | Core issue - traffic routing prioritizes traffic control over scaling limits |
+| **scaleDownDelaySeconds** | ❌ **Validation Error** | ✅ **Supported** | Only available with traffic routing for gradual traffic shifting |
+| **dynamicStableScale** | ❌ **Validation Error** | ✅ **Supported** | Dynamically scales stable ReplicaSet to minimize total pods during updates |
+| **minPodsPerReplicaSet** | ❌ **Not Applicable** | ✅ **Supported** | Ensures minimum pod floor for high availability in traffic-routed canaries |
+| **Traffic Weight Control** | ❌ **Not Applicable** | ✅ **Supported** | Fine-grained traffic distribution (0-100%) between stable and canary |
+| **Service Mesh Integration** | ❌ **Not Applicable** | ✅ **Supported** | Istio, Linkerd, ALB, SMI traffic routing providers |
+| **Instant Rollback** | ✅ **Supported** | ✅ **Supported** | Traffic routing enables faster rollbacks via traffic shifting |
 
 ### Technical Gap Confirmed
 - **Basic Canary:** Respects maxSurge/maxUnavailable via `CalculateReplicaCountsForBasicCanary()`
@@ -109,7 +121,7 @@ The current workarounds (MinPodsPerReplicaSet, manual canary steps) are inadequa
 1. **Immediate:** Add validation warning for unsupported maxSurge/maxUnavailable with traffic routing
 2. **Community:** Engage maintainers in GitHub issue #2239 discussion
 3. **Documentation:** Improve MinPodsPerReplicaSet guidance and manual step workarounds
-4. **Design Analysis:** See `08_relative_interpretation_analysis.md` for detailed evaluation of making maxSurge/maxUnavailable relative to traffic weight changes
+4. **Design Analysis:** See `07_relative_interpretation_analysis.md` for detailed evaluation of making maxSurge/maxUnavailable relative to traffic weight changes
 5. **Long-term:** Pursue implementation only if consensus achievable
 
 ---

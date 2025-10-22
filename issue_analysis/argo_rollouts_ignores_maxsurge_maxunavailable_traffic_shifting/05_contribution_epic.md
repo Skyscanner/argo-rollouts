@@ -144,7 +144,7 @@ steps:
 2. Ensure rollback minimum availability logic still functions
 3. Consider interaction with `minPodsPerReplicaSet`
 4. Preserve dynamic stable scaling behavior
-5. Evaluate relative percentage interpretation between canary steps (see `08_relative_interpretation_analysis.md`)
+5. Evaluate relative percentage interpretation between canary steps (see `07_relative_interpretation_analysis.md`)
 
 ## Contribution Strategy
 **Upstream Reception:** High controversy - challenges fundamental traffic routing design decisions.
