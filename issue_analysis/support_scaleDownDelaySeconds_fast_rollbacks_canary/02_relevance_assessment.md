@@ -56,6 +56,15 @@ if rollout.Spec.Strategy.Canary != nil {
 }
 ```
 
+**Note on the 30s default and operational recommendations**
+
+- The `DefaultScaleDownDelaySeconds` and `DefaultAbortScaleDownDelaySeconds` are set to `30` in
+    `utils/defaults/defaults.go`. The proto and experiment type comments recommend 30s as a
+    minimum to allow iptables/service-provider propagation after switching selectors. However,
+    empirical testing (see `empirical_evidence.md`) and practical rollout timings show 30s is
+    frequently too short for human or CI-driven rollback flows. We recommend setting
+    `scaleDownDelaySeconds` to 300–600s for production use (example manifest: `examples/rollout-scaleDownDelay-5m.yaml`).
+
 ### 5. Feature Parity Gap
 Current state comparison:
 
@@ -135,6 +144,9 @@ Searched recent commits for scaleDownDelaySeconds, fast rollback, and canary-rel
 3. **Feature parity missing:** Blue-green strategy offers superior rollback capabilities compared to canary
 4. **Infrastructure exists:** Scale down delay mechanism is implemented but not fully leveraged for canary fast rollbacks
 
+
+Reference: upstream discussion on this behavior is tracked at Issue #557.
+
 ### Priority Assessment: HIGH
 - This affects deployment strategy choice and rollback capabilities
 - Feature parity between deployment strategies is important for user experience
@@ -148,3 +160,15 @@ Searched recent commits for scaleDownDelaySeconds, fast rollback, and canary-rel
 2. Research upstream community discussions and approaches
 3. Design implementation that leverages existing infrastructure
 4. Plan comprehensive solution including basic canary support and fast rollback integration
+
+## Upstream references (selected)
+
+- Historical discussion on iptables/service propagation (why 30s minimum): https://github.com/argoproj/argo-rollouts/issues/19#issuecomment-476329960
+- Enhancement: Support scaleDownDelaySeconds & fast rollbacks for canary — https://github.com/argoproj/argo-rollouts/issues/557
+- AnalysisRun rollback-window fix (PR #3670) — https://github.com/argoproj/argo-rollouts/pull/3670 (commit 243ea917)
+- progressDeadlineSeconds vs scaleDownDelaySeconds discussion/fix (Issue #3414 / PR #3417) — https://github.com/argoproj/argo-rollouts/issues/3414 and https://github.com/argoproj/argo-rollouts/pull/3417
+- HPA + scaleDownDelaySeconds reported issues (Issue #3848) — https://github.com/argoproj/argo-rollouts/issues/3848
+- DynamicStableScale delay patch (PR #4337, not merged) — https://github.com/argoproj/argo-rollouts/pull/4337
+- Abort delay docs: see `pkg/apis/rollouts/v1alpha1/generated.proto` and `pkg/apis/rollouts/v1alpha1/experiment_types.go` for the documented 30s default for `abortScaleDownDelaySeconds`.
+
+**Note:** A new ticket C1' (Fast-rollback to known-good revision inside rollbackWindow even when RS scaled to 0) has been added to the contribution epic. This ticket frames the core missing capability: the controller cannot currently fast-track rollback to a prior revision if that revision's ReplicaSet was scaled to 0 and there's no retained evidence. C1' proposes adding conservative checks (for example, a retained successful AnalysisRun for that revision, rollout status evidence, or a recent scale-down-deadline annotation) as signals to allow skipping new AnalysisRuns during rollback and advancing steps safely. If none of those signals exist (GC'd RS or missing AR), the controller should continue to use normal rollback behavior.

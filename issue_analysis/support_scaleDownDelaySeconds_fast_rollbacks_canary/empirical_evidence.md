@@ -253,4 +253,11 @@ Hard to reproduce, slingshot is too slow to do it in 30s, we may need to specify
 **Implication:**
 The inconsistent behavior is NOT due to window calculation failures, but due to other conditions in the analysis skipping logic that override the rollback window detection.
 
+Recommendation:
+
+- The default `scaleDownDelaySeconds: 30` is often too short for automated or human rollback flows. In practice we found that the GitOps pipeline and tooling (Slingshot) could not reliably complete a rollback inside 30s. For practical tests and production, set `scaleDownDelaySeconds` to a larger value such as `300` (5 minutes) or `600` (10 minutes). See `examples/rollout-scaleDownDelay-5m.yaml` for a ready-to-use example manifest.
+
+
+Reference: see Issue #557 for the upstream conversation and clarifying comments that informed the epic goals.
+
 
