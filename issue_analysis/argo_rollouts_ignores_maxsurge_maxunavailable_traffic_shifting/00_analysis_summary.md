@@ -16,6 +16,23 @@
 ## Executive Summary
 This analysis reveals that the omission of `maxSurge` and `maxUnavailable` support in traffic-routed canary deployments is **an intentional design decision**, not a bug or oversight. The Argo Rollouts maintainers deliberately prioritize traffic control over pod scaling limits, as evidenced by maintainer discussions in CNCF Slack and GitHub issue #2239.
 
+## Community Context: Multiple Similar Issues
+
+**Critical Context:** This issue is not isolated - multiple community members have reported the same problem, indicating widespread user impact and strong demand for resolution.
+
+| Issue # | Title | Status | User Impact | Key Evidence |
+|---------|-------|--------|-------------|--------------|
+| **#2239** | Traffic Routing and maxSurge/maxUnavailable | Open/Design Discussion | **CRITICAL** - Explains intentional design | Zach Aller (maintainer) references this issue explaining why maxSurge/maxUnavailable are intentionally not used with traffic routing |
+| **#3284** | [Request] Support maxSurge/maxUnavailable with traffic routing | Open | **HIGH** - Feature request | Community demand for functionality to control "very rapid infrastructure scaling" |
+| **#3539** | maxSurge and maxUnavailable ignored when using traffic routing | Open | **HIGH** - Infrastructure scaling issues | Reports "very rapid infrastructure scaling" causing cost and resource problems |
+| **#3397** | maxSurge/maxUnavailable not respected with traffic routing | Open | **HIGH** - Scaling control gaps | Another instance of the same scaling control problem |
+
+**Community Impact Summary:**
+- **4+ Open Issues** spanning multiple years indicate persistent user pain points
+- **Consistent Problem Description:** "very rapid infrastructure scaling" when using traffic routing
+- **Business Impact:** Unexpected infrastructure costs and resource consumption
+- **User Demand:** Clear community consensus that maxSurge/maxUnavailable support is needed
+
 ## Key Findings
 
 ### Functionality Matrix: Basic vs Traffic-Enabled Canaries
@@ -77,9 +94,9 @@ stableCount = trafficWeightToReplicas(rolloutSpecReplica, maxWeight-desiredWeigh
 - **Design Philosophy:** Traffic weights drive scaling, not Kubernetes deployment limits
 
 ### Community Impact
-- **Multiple Issues:** #3284, #3539, #3397 report "very rapid infrastructure scaling"
-- **User Pain Points:** Unexpected cost and resource consumption
-- **Demand Exists:** Community clearly wants maxSurge/maxUnavailable support
+- **Widespread User Pain Points:** Multiple users report "very rapid infrastructure scaling" causing unexpected costs
+- **Strong Feature Demand:** Community clearly wants maxSurge/maxUnavailable support despite maintainer design philosophy
+- **Infrastructure Pressure:** Lack of scaling controls puts additional pressure on cluster autoscaling systems
 
 ### Current Workarounds Analysis
 
@@ -150,6 +167,8 @@ This issue represents a **nuanced design philosophy conflict** with a potential 
 - **With dynamicStableScale:** Both limits become technically feasible and could address user scaling concerns
 
 **Key Insight:** The implementation may be viable when `dynamicStableScale=true`, potentially resolving the conflict without challenging core traffic routing principles.
+
+**Community Context:** As detailed in the "Community Context" section above, this is not an isolated issue - 4+ open GitHub issues spanning multiple years indicate persistent user pain points with "very rapid infrastructure scaling" when using traffic routing.
 
 The current workarounds (MinPodsPerReplicaSet, manual canary steps) remain inadequate, but the dynamicStableScale analysis opens a new implementation pathway that respects the existing design philosophy while addressing user infrastructure scaling pain points.
 
