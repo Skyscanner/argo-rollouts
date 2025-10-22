@@ -13,12 +13,14 @@
 - Deep analysis of design decisions from issue #2239
 - Surveying multiple related issues (#3284, #3539, #3397)
 - Evaluating MinPodsPerReplicaSet effectiveness as current workaround
+- Analyzing dynamicStableScale impact on maxSurge/maxUnavailable feasibility
 - Assessing manual canary steps as alternative scaling control
 
 **Key Activities:**
 - Code archaeology to understand traffic routing design decisions
 - Community engagement and maintainer discussions
 - Analysis of MinPodsPerReplicaSet limitations
+- Assessment of whether maxSurge/maxUnavailable can be supported when dynamicStableScale is enabled
 - Documentation of manual workaround pain points
 
 ### Phase 2: Design & Technical Approach (1-2 weeks, conditional)

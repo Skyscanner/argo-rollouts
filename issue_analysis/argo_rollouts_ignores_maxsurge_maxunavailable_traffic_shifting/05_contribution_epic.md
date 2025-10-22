@@ -73,14 +73,18 @@ steps:
   - **Acceptance Criteria:** Assess if MinPodsPerReplicaSet adequately addresses scaling concerns
   - **Dependencies:** None
 
-- [ ] **Task 1.4:** Engage maintainers on design philosophy change
+- [ ] **Task 1.4:** **NEW:** Analyze dynamicStableScale impact on maxSurge/maxUnavailable feasibility
+  - **Acceptance Criteria:** Determine if maxSurge/maxUnavailable can be supported when dynamicStableScale is enabled
+  - **Dependencies:** None
+
+- [ ] **Task 1.5:** Engage maintainers on design philosophy change
   - **Acceptance Criteria:** Open discussion on whether design should be revisited
-  - **Dependencies:** Tasks 1.1, 1.2, 1.3
+  - **Dependencies:** Tasks 1.1, 1.2, 1.3, 1.4
 
 ### Phase 2: Design & Technical Approach (Conditional)
 - [ ] **Task 2.1:** Design maxSurge integration with traffic routing
   - **Acceptance Criteria:** Define approach that doesn't break traffic control priorities
-  - **Dependencies:** Task 1.4 approval
+  - **Dependencies:** Task 1.5 approval
   
 - [ ] **Task 2.2:** Evaluate relative percentage interpretation
   - **Acceptance Criteria:** Analyze making maxSurge/maxUnavailable relative to traffic weight changes between steps
@@ -119,7 +123,7 @@ steps:
 ### Phase 5: Alternative Solutions (If Implementation Rejected)
 - [ ] **Task 5.1:** Improve `minPodsPerReplicaSet` documentation
   - **Acceptance Criteria:** Better guidance on using traffic routing's scaling controls
-  - **Dependencies:** Task 1.4 rejection
+  - **Dependencies:** Task 1.5 rejection
   
 - [ ] **Task 5.2:** Create infrastructure scaling best practices
   - **Acceptance Criteria:** Recommendations for avoiding rapid scaling with traffic routing
@@ -137,7 +141,11 @@ steps:
 ## Technical Approach
 **Current Design Philosophy:** Traffic routing prioritizes traffic control over pod scaling limits. maxSurge/maxUnavailable are intentionally not supported.
 
-**Potential Implementation:** If approved, modify `CalculateReplicaCountsForTrafficRoutedCanary()` to apply maxSurge limits while preserving traffic control logic.
+**Critical New Insight:** Implementation feasibility depends on `dynamicStableScale` setting:
+- **Without dynamicStableScale:** maxSurge/maxUnavailable remain non-applicable (stable always fully scaled)
+- **With dynamicStableScale:** Both limits become technically feasible and meaningful
+
+**Potential Implementation:** If approved, modify `CalculateReplicaCountsForTrafficRoutedCanary()` to conditionally apply maxSurge/maxUnavailable when dynamicStableScale is enabled.
 
 **Key Considerations:**
 1. Maintain traffic shifting priority over scaling limits
@@ -145,6 +153,7 @@ steps:
 3. Consider interaction with `minPodsPerReplicaSet`
 4. Preserve dynamic stable scaling behavior
 5. Evaluate relative percentage interpretation between canary steps (see `07_relative_interpretation_analysis.md`)
+6. **NEW:** Implementation may only be viable when `dynamicStableScale=true`
 
 ## Contribution Strategy
 **Upstream Reception:** High controversy - challenges fundamental traffic routing design decisions.

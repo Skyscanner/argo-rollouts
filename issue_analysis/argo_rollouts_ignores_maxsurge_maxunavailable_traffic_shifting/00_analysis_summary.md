@@ -22,13 +22,49 @@ This analysis reveals that the omission of `maxSurge` and `maxUnavailable` suppo
 
 | Feature | Basic Canary | Traffic-Enabled Canary | Notes |
 |---------|-------------|----------------------|-------|
-| **maxSurge/maxUnavailable** | ✅ **Supported** | ❌ **Ignored** | Core issue - traffic routing prioritizes traffic control over scaling limits |
+| **maxSurge/maxUnavailable** | ✅ **Supported** | ⚠️ **Conditional** | Depends on dynamicStableScale; ignored by default for instant rollback |
 | **scaleDownDelaySeconds** | ❌ **Validation Error** | ✅ **Supported** | Only available with traffic routing for gradual traffic shifting |
 | **dynamicStableScale** | ❌ **Validation Error** | ✅ **Supported** | Dynamically scales stable ReplicaSet to minimize total pods during updates |
 | **minPodsPerReplicaSet** | ❌ **Not Applicable** | ✅ **Supported** | Ensures minimum pod floor for high availability in traffic-routed canaries |
 | **Traffic Weight Control** | ❌ **Not Applicable** | ✅ **Supported** | Fine-grained traffic distribution (0-100%) between stable and canary |
 | **Service Mesh Integration** | ❌ **Not Applicable** | ✅ **Supported** | Istio, Linkerd, ALB, SMI traffic routing providers |
 | **Instant Rollback** | ✅ **Supported** | ✅ **Supported** | Traffic routing enables faster rollbacks via traffic shifting |
+
+### DynamicStableScale Impact Analysis
+
+**Critical Finding:** The feasibility of implementing `maxSurge`/`maxUnavailable` for traffic-enabled canaries depends heavily on the `dynamicStableScale` setting.
+
+#### Without DynamicStableScale (Default Behavior)
+**Current State:** Stable ReplicaSet remains fully scaled to support instant rollbacks.
+
+**Scaling Dynamics:**
+```go
+// In CalculateReplicaCountsForTrafficRoutedCanary()
+// When !rollout.Spec.Strategy.Canary.DynamicStableScale
+return canaryCount, rolloutSpecReplica  // stable = full scale
+```
+
+**maxSurge/maxUnavailable Applicability:**
+- **maxUnavailable:** ❌ **Not Applicable** - No "unavailable" capacity exists; stable is always at 100%
+- **maxSurge:** ⚠️ **Theoretically Possible** - Could limit canary ReplicaSet scale-up, but current implementation ignores it entirely
+
+**Why Ignored:** Design prioritizes traffic control over pod scaling limits for instant rollback capability.
+
+#### With DynamicStableScale Enabled
+**Current State:** Stable ReplicaSet scales dynamically based on traffic weights.
+
+**Scaling Dynamics:**
+```go
+// When rollout.Spec.Strategy.Canary.DynamicStableScale == true
+stableCount = trafficWeightToReplicas(rolloutSpecReplica, maxWeight-desiredWeight, maxWeight)
+// Total replicas can now vary: canary + stable ≠ rolloutSpecReplica
+```
+
+**maxSurge/maxUnavailable Applicability:**
+- **maxUnavailable:** ✅ **Fully Applicable** - Both ReplicaSets can scale down below desired traffic-based counts
+- **maxSurge:** ✅ **Fully Applicable** - Total replica count across ReplicaSets can exceed rollout spec
+
+**Implementation Feasibility:** Both limits become meaningful when stable scaling is dynamic.
 
 ### Technical Gap Confirmed
 - **Basic Canary:** Respects maxSurge/maxUnavailable via `CalculateReplicaCountsForBasicCanary()`
@@ -104,25 +140,26 @@ Initial analysis treated this as a technical oversight. However, CNCF Slack cont
 2. **Short-term:** Improve MinPodsPerReplicaSet documentation and best practices
 3. **Long-term:** Pursue design change only with strong community consensus
 
-### Effort Estimate
-- **Design Discussion:** 2-3 weeks (required)
-- **Implementation (if approved):** 2-3 weeks
-- **Documentation Alternative:** 1-2 weeks
-- **Total Range:** 3-8 weeks depending on maintainer consensus
-
 ## Conclusion
-This issue represents a **design philosophy conflict** between:
-- **Maintainer View:** Traffic control takes precedence over scaling limits
-- **User View:** Infrastructure costs and resource management are critical
+This issue represents a **nuanced design philosophy conflict** with a potential technical solution:
 
-The current workarounds (MinPodsPerReplicaSet, manual canary steps) are inadequate solutions that highlight the real need for proper scaling controls. However, challenging this fundamental design decision requires strong community consensus and may face maintainer resistance.
+**Traditional View:** Traffic control takes precedence over scaling limits (maintainer perspective)
+
+**Emerging Understanding:** 
+- **Without dynamicStableScale:** maxSurge/maxUnavailable remain non-applicable due to instant rollback requirements
+- **With dynamicStableScale:** Both limits become technically feasible and could address user scaling concerns
+
+**Key Insight:** The implementation may be viable when `dynamicStableScale=true`, potentially resolving the conflict without challenging core traffic routing principles.
+
+The current workarounds (MinPodsPerReplicaSet, manual canary steps) remain inadequate, but the dynamicStableScale analysis opens a new implementation pathway that respects the existing design philosophy while addressing user infrastructure scaling pain points.
 
 ## Next Steps
 1. **Immediate:** Add validation warning for unsupported maxSurge/maxUnavailable with traffic routing
-2. **Community:** Engage maintainers in GitHub issue #2239 discussion
-3. **Documentation:** Improve MinPodsPerReplicaSet guidance and manual step workarounds
-4. **Design Analysis:** See `07_relative_interpretation_analysis.md` for detailed evaluation of making maxSurge/maxUnavailable relative to traffic weight changes
-5. **Long-term:** Pursue implementation only if consensus achievable
+2. **Analysis:** Complete dynamicStableScale impact assessment on implementation feasibility
+3. **Community:** Engage maintainers in GitHub issue #2239 discussion with new technical insights
+4. **Documentation:** Improve MinPodsPerReplicaSet guidance and manual step workarounds
+5. **Design Analysis:** See `07_relative_interpretation_analysis.md` for detailed evaluation of making maxSurge/maxUnavailable relative to traffic weight changes
+6. **Long-term:** Pursue conditional implementation (dynamicStableScale=true only) if consensus achievable
 
 ---
 *Analysis completed following in_depth_issue_analysis.prompt.md methodology*
