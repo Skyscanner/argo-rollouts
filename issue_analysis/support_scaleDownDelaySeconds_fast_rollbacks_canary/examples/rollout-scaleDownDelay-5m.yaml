@@ -1,0 +1,42 @@
+# Example Rollout manifest demonstrating a production-friendly scaleDownDelaySeconds
+# This example is intended to be used with TrafficRouting (e.g., Istio) so that
+# the controller keeps the previous ReplicaSet around for 5 minutes after
+# promotion, allowing human or automated rollback to reuse pods without waiting
+# for a fresh ReplicaSet to spin up.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: example-canary-scale-delay
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      # Traffic routing (Istio/Split or similar) required for scaleDownDelaySeconds
+      trafficRouting:
+        istio:
+          virtualService:
+            name: example-virtualservice
+            routes:
+              - name: primary
+      # Keep previous ReplicaSet for 5 minutes after promotion
+      scaleDownDelaySeconds: 300
+      steps:
+        - setWeight: 20
+        - pause: {duration: 60}
+        - setWeight: 50
+        - pause: {duration: 120}
+        - setWeight: 100
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      containers:
+        - name: web
+          image: nginx:stable
+          ports:
+            - containerPort: 80
