@@ -10,7 +10,7 @@ This comprehensive analysis reveals that Argo Rollouts issue #3 represents a **f
 
 **Solution**: Implement percentage-based health checking with `minHealthy` parameters that integrate properly with `maxSurge`/`maxUnavailable` controls.
 
-**Recommendation**: CRITICAL priority implementation (22-30 weeks, 3-4 engineers, HIGH risk) to unlock large-scale progressive delivery capabilities.
+**Recommendation**: CRITICAL priority implementation to unlock large-scale progressive delivery capabilities.
 
 ## Community Context: Multiple Similar Issues
 
@@ -181,133 +181,24 @@ spec:
       dynamicStableScale: true # Existing: resource optimization
 ```
 
-## Effort and Timeline (Updated)
-
-### Development Effort
-- **Total Time**: 22-30 weeks (5-7 months)
-- **Team Size**: 3-4 engineers (cross-functional)
-- **Risk Level**: HIGH
-- **Complexity**: VERY HIGH
-
-### Phase Breakdown
-1. **Analysis & Design**: 4-6 weeks (API, algorithms, mathematical modeling)
-2. **Core Implementation**: 8-10 weeks (health checks, scaling, integration)
-3. **Testing & Validation**: 6-8 weeks (large-scale, autoscaling, chaos testing)
-4. **Documentation & Release**: 4-6 weeks (docs, migration, community)
-
-### Key Challenges
-- **Mathematical Complexity**: Modeling percentage interactions
-- **Large-Scale Testing**: Validating with 500+ pod deployments
-- **Autoscaling Integration**: Working with Karpenter, CA, spot instances
-- **PDB Compatibility**: Respecting disruption budget constraints
-
-## Risk Assessment (Elevated)
-
-### Technical Risks
-- **Algorithm Correctness**: Complex percentage calculations with edge cases
-- **Performance Scaling**: Health checks must work with 1000+ pods
-- **Integration Conflicts**: Service mesh, autoscaling system compatibility
-
-### Operational Risks
-- **Deployment Reliability**: New logic could introduce failures
-- **Backward Compatibility**: Existing rollouts must continue working
-- **Migration Complexity**: Users need clear upgrade paths
-
-### Business Risks
-- **Timeline Overrun**: Complex implementation may take longer
-- **Resource Requirements**: Need specialized team and infrastructure
-- **Community Acceptance**: May require extensive design iteration
-
-## Upstream and Industry Context (Updated)
-
-### Competitive Analysis
-| Tool | Health Model | Autoscaling | Large-Scale | PDB Support |
-|------|-------------|-------------|-------------|-------------|
-| Argo Rollouts | Binary (100%) | Limited | Poor | No |
-| Flagger | Percentage/Threshold | Good | Good | Yes |
-| Keptn | SLO-Based | Excellent | Excellent | Yes |
-| K8s Deployment | Percentage | Basic | Good | Yes |
-
-**Gap**: Argo Rollouts is 2-3 generations behind in health checking sophistication.
-
-### Industry Trends
-- **Percentage-Based Deployments**: Standard in modern tools
-- **Autoscaling-First Design**: Built for dynamic infrastructure
-- **PDB-Aware Systems**: Respect disruption budgets
-- **Large-Scale Native**: Designed for 1000+ pod deployments
-
-### Market Pressure
-- **Enterprise Requirements**: Large organizations demand scale
-- **Cloud Cost Optimization**: Autoscaling and spot instances critical
-- **Operational Maturity**: Zero-touch deployments expected
-
 ## Implementation Recommendation
 
 ### Priority: CRITICAL
 This issue is a **fundamental blocker** for enterprise adoption and large-scale progressive delivery. It represents an architectural debt that prevents Argo Rollouts from competing in modern cloud-native environments.
 
-### Implementation Strategy
-1. **Dedicated Cross-Functional Team**: 3-4 engineers with specialized skills
-2. **Phased Development**: Analysis → Implementation → Testing → Release
-3. **Feature Flags**: Gradual rollout with backward compatibility
-4. **Mathematical Rigor**: Thorough modeling and validation
-5. **Large-Scale Validation**: Real-world testing with enterprise scenarios
+### Next Steps
+The contribution epic provides initial exploration directions. Further work should focus on:
+- Detailed technical design and prototyping
+- Community feedback and validation
+- Iterative implementation with extensive testing
+- Clear migration paths for existing users
 
-### Success Metrics
-- **Deployment Success**: >98% success rate for large-scale rollouts
-- **Resource Efficiency**: 40-60% reduction in required capacity
-- **Autoscaling Compatibility**: Full support for Karpenter, CA, spot instances
-- **PDB Compliance**: 100% respect for disruption budgets
-- **User Adoption**: Rapid adoption by large-scale users
+### Success Criteria
+- Enable successful rollouts for services with 100+ pods
+- Full compatibility with autoscaling systems
+- Respect for Pod Disruption Budget constraints
+- Maintain backward compatibility where possible
 
-### Alternative Approaches Considered
+**Final Recommendation**: Proceed with CRITICAL priority. This is not an optional enhancement but a core capability required for Argo Rollouts' future relevance in the progressive delivery landscape.
 
-#### Quick Fix (Rejected)
-- **Simple Timeout**: Allow rollouts to proceed after timeout
-- **Reason**: Doesn't solve root cause, creates unsafe deployments
-
-#### Incremental Changes (Rejected)
-- **Small Percentage Adjustments**: Gradually reduce from 100%
-- **Reason**: Still binary logic, doesn't integrate with surge/unavailable
-
-#### External Controller (Rejected)
-- **Sidecar Controller**: Separate controller for health checking
-- **Reason**: Complex deployment, maintenance burden, doesn't fix core
-
-### Recommended Path Forward
-
-#### Immediate Actions (Next 4 weeks)
-1. **Team Assembly**: Form cross-functional team with required expertise
-2. **Infrastructure Setup**: Establish large-scale testing environments
-3. **Community Engagement**: Share analysis and gather feedback
-4. **Design Kickoff**: Begin detailed technical design
-
-#### Short-term Goals (3-6 months)
-1. **Core Implementation**: Percentage-based health checking
-2. **Autoscaling Integration**: Full compatibility with scaling systems
-3. **Large-Scale Testing**: Validation with enterprise-scale deployments
-4. **API Stabilization**: Finalize minHealthy parameter design
-
-#### Long-term Vision (6-12 months)
-1. **Industry Leadership**: Match/exceed Flagger, Keptn capabilities
-2. **Advanced Features**: SLO-based health, predictive scaling
-3. **Ecosystem Integration**: Deep integration with cloud platforms
-4. **Community Growth**: Attract large-scale users to Argo Rollouts
-
-## Conclusion
-
-This analysis reveals that Argo Rollouts issue #3 is not a minor scaling optimization but a **fundamental architectural limitation** that prevents the tool from working in modern autoscaling environments. The binary health checking approach, designed for simpler times, is incompatible with large-scale deployments using Pod Disruption Budgets, cluster autoscaling, and spot instances.
-
-**Community Context:** As detailed in the "Community Context" section above, this is not an isolated issue - multiple related problems spanning rollout deadlocks, autoscaling conflicts, and PDB violations indicate persistent user pain points that prevent Argo Rollouts adoption at scale.
-
-**The solution requires a complete rethinking of rollout health logic**, moving from "all healthy" to "sufficiently healthy" with percentage-based requirements that properly integrate with Kubernetes deployment controls.
-
-**This is a strategic investment** that will:
-- Unlock enterprise-scale progressive delivery
-- Position Argo Rollouts as a competitive tool for large organizations
-- Reduce operational complexity and infrastructure costs
-- Enable modern cloud-native deployment patterns
-
-**Final Recommendation**: Proceed with CRITICAL priority and dedicated resources. This is not an optional enhancement but a core capability required for Argo Rollouts' future relevance in the progressive delivery landscape.
-
-**Call to Action**: Allocate the recommended team and timeline immediately. The longer this issue persists, the more enterprise opportunities Argo Rollouts loses to competing tools.
+**Call to Action**: Begin exploration and design work immediately. The longer this issue persists, the more enterprise opportunities Argo Rollouts loses to competing tools.
