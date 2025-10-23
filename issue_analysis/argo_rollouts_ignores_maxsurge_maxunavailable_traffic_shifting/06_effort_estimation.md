@@ -1,66 +1,36 @@
-# Exploration Analysis: Argo-rollouts ignores maxSurge and maxUnavailable when traffic shifting is used
+# Argo Rollouts Ignores maxSurge/maxUnavailable in Traffic Shifting
 
-## Overview
-**Issue Type:** Design Philosophy Challenge (not a bug fix)  
-**Complexity:** High (requires maintainer consensus and potential design changes)
+## Source-Backed Facts
 
-## Technical Considerations
+### Current Implementation
+- **Traffic-routed canaries ignore maxSurge/maxUnavailable**: Code in `utils/replicaset/canary.go` shows `CalculateReplicaCountsForTrafficRoutedCanary` does not apply these limits
+- **Basic canary respects limits**: `CalculateReplicaCountsForBasicCanary` applies maxSurge/maxUnavailable to total rollout replicas
+- **Design decision**: Traffic routing prioritizes traffic control over pod scaling limits (maintainer position from GitHub issues)
 
-### Current Design Philosophy
-Traffic routing prioritizes traffic control over pod scaling limits. maxSurge/maxUnavailable are intentionally not supported to maintain traffic shifting priority.
+### GitHub Issues
+- **#3284**: User reports maxSurge/maxUnavailable ignored in traffic-routed deployments
+- **#3539**: Request for scaling control in traffic-routed canaries  
+- **#3397**: Discussion of scaling behavior differences between canary types
+- **#2239**: Related scaling behavior analysis
 
-### Key Technical Insights
-- **Critical Finding:** Implementation feasibility depends on `dynamicStableScale` setting
-- **Without dynamicStableScale:** maxSurge/maxUnavailable remain non-applicable (stable always fully scaled)
-- **With dynamicStableScale:** Both limits become technically feasible and meaningful
+### Code References
+- `rollout/canary.go`: Traffic weight to replica calculations
+- `utils/replicaset/canary.go`: Replica count calculation functions
+- `utils/conditions/conditions.go`: RolloutHealthy function with availability requirements
 
-### Implementation Considerations
-- Maintain traffic shifting priority over scaling limits
-- Ensure rollback minimum availability logic still functions
-- Consider interaction with `minPodsPerReplicaSet`
-- Preserve dynamic stable scaling behavior
-- Evaluate relative percentage interpretation between canary steps
+## Manual Exploration Required
 
-## Community and Design Factors
+### Implementation Questions
+- How does `dynamicStableScale` setting affect scaling behavior?
+- What are the exact replica calculation differences between basic and traffic-routed canaries?
+- How does `minPodsPerReplicaSet` interact with traffic routing?
 
-### User Pain Points
-- "Very rapid infrastructure scaling" causing cost and resource problems
-- Need for scaling control in traffic-routed deployments
-- Manual canary steps as poor workaround for scaling control
+### Design Philosophy Questions  
+- Should traffic routing continue to override scaling limits?
+- What are the trade-offs between traffic control and scaling control?
+- How do other progressive delivery tools handle this conflict?
 
-### Current Workarounds
-- **MinPodsPerReplicaSet:** Provides minimum pod floor but doesn't control surge
-- **Manual Canary Steps:** Verbose and hard to maintain
-- **Documentation:** Limited guidance on scaling behavior
-
-### Community Reception Assessment
-- **High Controversy:** Challenges fundamental traffic routing design decisions
-- **Strong User Demand:** Multiple issues (#3284, #3539, #3397) requesting functionality
-- **Maintainer Position:** Intentional design decision prioritizing traffic control
-
-## Exploration Directions
-
-### Design Philosophy Evaluation
-- Investigate whether current traffic routing design should be revisited
-- Assess community consensus on maxSurge/maxUnavailable support
-- Analyze dynamicStableScale impact on implementation feasibility
-
-### Technical Approaches
-- Examine relative percentage interpretation between canary steps
-- Compare absolute vs relative approaches for scaling limits
-- Evaluate integration with existing traffic control logic
-
-### Alternative Solutions
-- Enhance MinPodsPerReplicaSet documentation and best practices
-- Develop infrastructure scaling best practices for traffic routing
-- Improve guidance for manual canary step approaches
-
-## Open Questions
-- Should the design philosophy be revisited to support maxSurge/maxUnavailable?
-- How does dynamicStableScale impact implementation feasibility?
-- What are the trade-offs between absolute and relative scaling interpretations?
-- Can MinPodsPerReplicaSet be enhanced to better address scaling concerns?
-- What validation and warnings should be provided for unsupported configurations?
-
-## Key Insight
-MinPodsPerReplicaSet provides some scaling control but doesn't address the core issue of rapid scaling between traffic weights. Manual canary steps highlight the real need for proper scaling controls in traffic-routed deployments.
+### User Impact Questions
+- What specific scaling problems do users encounter without these limits?
+- How effective are current workarounds (manual steps, minPodsPerReplicaSet)?
+- What validation warnings should be provided for unsupported configurations?

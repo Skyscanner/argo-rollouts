@@ -1,42 +1,29 @@
-# Issue Relevance Assessment: Argo-rollouts ignores maxSurge and maxUnavailable when traffic shifting is used
+# Relevance Assessment: maxSurge/maxUnavailable Ignored with Traffic Shifting
 
-## Assessment Date
-22 October 2025
+## Issue Relevance: HIGH
 
-## Current Status
-- [x] Issue is still present
-- [ ] Issue has been resolved
-- [ ] Issue is partially resolved
-- [ ] Issue is no longer relevant
+**Status**: Still present in current codebase.
 
-## Evidence
-The issue remains present in the current codebase. Analysis of the code shows that:
+## Technical Evidence
 
-1. **Basic Canary Logic** (`CalculateReplicaCountsForBasicCanary`):
-   - Uses `MaxSurge(rollout)` function to respect surge limits
-   - Calculates `maxReplicaCountAllowed = rolloutSpecReplica + maxSurge`
-   - Limits total replica count across all ReplicaSets
+**Basic Canary**: `CalculateReplicaCountsForBasicCanary()` uses `MaxSurge(rollout)` to respect limits.
 
-2. **Traffic-Routed Canary Logic** (`CalculateReplicaCountsForTrafficRoutedCanary`):
-   - Does NOT use `MaxSurge()` or `maxUnavailable` settings
-   - Calculates replica counts based solely on traffic weights
-   - Can exceed `rolloutSpecReplica + maxSurge` limits
+**Traffic-Routed Canary**: `CalculateReplicaCountsForTrafficRoutedCanary()` ignores maxSurge/maxUnavailable.
 
-## Testing Results
-Code review confirms the issue exists:
+**Test Evidence**: Code review confirms traffic-routed tests don't validate surge behavior.
 
-- `CalculateReplicaCountsForTrafficRoutedCanary()` in `utils/replicaset/canary.go` (line 341) has no reference to maxSurge/maxUnavailable
-- `CalculateReplicaCountsForBasicCanary()` in the same file (line 94) properly uses `MaxSurge(rollout)` 
-- Test cases in `canary_test.go` with `trafficRouting` set do not validate maxSurge behavior
+## Impact Analysis
 
-## Recent Changes Review
-No recent commits appear to have addressed this issue. The core logic in `CalculateReplicaCountsForTrafficRoutedCanary` remains unchanged and still ignores surge limits.
+**Operational Impact**: Excessive scaling affects cluster autoscaling efficiency and cost.
 
-## Conclusion
-This issue is **STILL RELEVANT** and affects all Argo Rollouts users who:
-- Use canary deployments with traffic routing (Istio, ALB, SMI, etc.)
-- Configure `maxSurge` or `maxUnavailable` settings
-- Rely on cluster autoscaling to manage node provisioning
+**Affected Users**: All using traffic-routed canaries (Istio, ALB, SMI) with configured scaling limits.
 
-The issue can cause excessive scaling that impacts cluster autoscaling efficiency and cost.</content>
-<parameter name="filePath">/Users/nebojsaprodana/dev/skyscanner/skyscanner-ghec/argo-rollouts/issue_analysis/argo_rollouts_ignores_maxsurge_maxunavailable_traffic_shifting/02_relevance_assessment.md
+## Manual Exploration Required
+
+**Investigate Further**:
+- Review recent commits for any changes to scaling logic
+- Test behavior with different traffic routing configurations
+- Analyze impact on cluster autoscaling systems
+- Examine user reports of scaling issues
+
+**Key Question**: How does this issue affect real-world deployment costs and performance?

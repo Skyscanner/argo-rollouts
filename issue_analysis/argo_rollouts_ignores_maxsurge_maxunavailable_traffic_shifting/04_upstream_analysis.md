@@ -1,67 +1,35 @@
-# Upstream Analysis: Argo-rollouts ignores maxSurge and maxUnavailable when traffic shifting is used
+# Upstream Analysis: maxSurge/maxUnavailable with Traffic Shifting
 
-## Search Strategy
-**Keywords used:** maxSurge, maxUnavailable, traffic routing, canary, surge limits, #2239, #3284, #3539, #3397
-**Date range:** All history (searched git log and codebase references)
-**Search method:** Git log grep, codebase references, CHANGELOG analysis, CNCF Slack discussion
+## Documented Issues
 
-## Similar Issues Found
-| Issue/PR # | Title | Status | Relevance | Key Insights |
-|------------|-------|--------|-----------|--------------|
-| #2239 | Traffic Routing and maxSurge/maxUnavailable | Open/Design Discussion | **CRITICAL** - Explains intentional design decision | Zach Aller references this as explaining why maxSurge/maxUnavailable are not used |
-| #1759 | fix!: improve basic canary approximation accuracy and honor maxSurge | Closed/Resolved | **HIGH** - Added maxSurge to basic canary | This PR fixed maxSurge for basic canary but did not address traffic-routed canary |
-| #3284 | [Request] Support maxSurge/maxUnavailable with traffic routing | Open | **HIGH** - User request for feature | Indicates community demand for this functionality |
-| #3539 | maxSurge and maxUnavailable ignored when using traffic routing | Open | **HIGH** - User issue report | Reports infrastructure scaling problems |
-| #3397 | maxSurge/maxUnavailable not respected with traffic routing | Open | **HIGH** - User issue report | Another instance of the same problem |
-| #1429 | fix: canary scaledown event could violate maxUnavailable | Closed/Resolved | **MEDIUM** - Related maxUnavailable fix | Another maxUnavailable fix that may not have addressed traffic routing |
-| #3375 | add unit tests for maxSurge=0, replicas=1 | Closed/Resolved | **LOW** - Test improvements | Added test coverage for edge cases |
+| Issue # | Title | Status | Key Insight |
+|---------|-------|--------|-------------|
+| #2239 | Traffic Routing and maxSurge/maxUnavailable | Open | Zach Aller explains intentional design decision |
+| #1759 | improve basic canary and honor maxSurge | Closed | Added maxSurge to basic canary only |
+| #3284 | Support maxSurge/maxUnavailable with traffic routing | Open | Community feature request |
+| #3539 | maxSurge and maxUnavailable ignored | Open | User reports scaling issues |
+| #3397 | maxSurge/maxUnavailable not respected | Open | Another scaling issue report |
 
-## Community Approaches
-### Successful Patterns
-- **Basic Canary maxSurge Implementation:** The `CalculateReplicaCountsForBasicCanary()` function properly implements maxSurge logic by calculating `maxReplicaCountAllowed = rolloutSpecReplica + maxSurge` and respecting these limits during scaling operations.
+## Community Context
 
-### Failed Approaches  
-- **Traffic-Routed Canary:** No implementation of maxSurge/maxUnavailable limits in `CalculateReplicaCountsForTrafficRoutedCanary()`, leading to unbounded scaling potential.
+**Maintainer Stance**: Traffic routing intentionally prioritizes traffic control over scaling limits.
 
-### Community Workarounds
-- **Rollback Behavior:** During rollbacks, traffic routing does provide some minimum availability protection by requesting max pods in stable set and gradually shifting traffic.
+**User Demand**: Multiple issues report "very rapid infrastructure scaling" problems.
 
-## Maintainer Preferences
-Based on CNCF Slack discussion (Feb 2024):
-- **Design Philosophy:** Traffic routing intentionally prioritizes traffic control over pod scaling limits
-- **Feature Scope:** Traffic routing only supports `minPodsPerReplicaSet`, not maxSurge/maxUnavailable
-- **Consistency:** Maintainers acknowledge the inconsistency but maintain it's by design
-- **User Impact:** Despite design intentions, users report "very rapid infrastructure scaling" issues
+**Design Conflict**: Traffic control vs pod scaling limits creates fundamental tension.
 
-## Ongoing Work
-- **Multiple Open Issues:** #3284, #3539, #3397 all request this feature
-- **No Active Implementation:** No pending PRs addressing this gap
-- **Community Discussion:** Active CNCF Slack discussion indicates this remains a user pain point
+## Implementation Patterns
 
-## Recommendations for Contribution Strategy
-- **Design Decision Challenge:** This appears to be an intentional design decision rather than an oversight
-- **Community Demand:** Multiple issues suggest strong user demand despite maintainer stance
-- **Implementation Path:** If pursuing, would need to convince maintainers to change design philosophy
-- **Alternative Approaches:** Consider documenting workarounds or providing `minPodsPerReplicaSet` guidance
-- **High Controversy:** This would require changing fundamental traffic routing design principles
+**Basic Canary**: Properly implements maxSurge via `maxReplicaCountAllowed = rolloutSpecReplica + maxSurge`.
 
-### Validation and User Experience Issues
+**Traffic-Routed Canary**: No maxSurge/maxUnavailable logic, scales based on traffic weights only.
 
-#### Missing Validation Warning
-**Current State:** No validation warning when maxSurge/maxUnavailable are set with traffic routing.
+## Manual Exploration Required
 
-**User Expectation:** Clear validation message stating these settings are ignored with traffic routing.
+**Investigate Further**:
+- Review maintainer discussions in issue #2239
+- Examine CNCF Slack threads on traffic routing design
+- Compare with other progressive delivery tools
+- Analyze user cost impact reports
 
-**Code Location:** `pkg/apis/rollouts/validation/validation.go` - `ValidateRolloutStrategyCanary()` function
-
-**Impact:** Users may unknowingly set maxSurge/maxUnavailable expecting them to work, leading to unexpected scaling behavior.
-
-#### Documentation Gaps
-**Current Documentation:** Limited guidance on traffic routing scaling behavior differences.
-
-**User Pain Point:** Lack of clear documentation about when and why maxSurge/maxUnavailable are ignored.
-
-**Recommendation:** Add prominent warnings in:
-- API documentation for maxSurge/maxUnavailable fields
-- Traffic routing documentation
-- Validation error messages
+**Key Question**: Is the design philosophy conflict resolvable, or is this a fundamental limitation?

@@ -1,58 +1,42 @@
-# Current State Analysis: Argo-rollouts ignores maxSurge and maxUnavailable when traffic shifting is used
+# Current State Analysis: maxSurge/maxUnavailable Ignored with Traffic Shifting
 
 ## Issue Summary
-When traffic shifting is used in Argo Rollouts canary deployments, the `maxSurge` and `maxUnavailable` settings are ignored. This can impact cluster autoscaling by putting additional pressure on autoscalers like Karpenter to provision new nodes unnecessarily.
+
+Traffic-routed canary deployments ignore `maxSurge` and `maxUnavailable` settings, unlike basic canary deployments.
 
 ## Critical Code Locations
-- **File:** `rollout/canary.go`
-  - **Function:** `reconcileCanaryReplicaSets()` (line 443)
-  - **Purpose:** Main reconciliation logic for canary ReplicaSets
 
-- **File:** `utils/replicaset/replicaset.go`
-  - **Function:** `NewRSNewReplicas()` (line 251)
-  - **Purpose:** Determines replica count for new ReplicaSet based on strategy
+**Basic Canary**: `utils/replicaset/canary.go:CalculateReplicaCountsForBasicCanary()` - respects maxSurge/maxUnavailable.
 
-- **File:** `utils/replicaset/canary.go`
-  - **Function:** `CalculateReplicaCountsForBasicCanary()` (line 94)
-  - **Purpose:** Calculates replica counts for basic canary (respects maxSurge/maxUnavailable)
+**Traffic-Routed Canary**: `utils/replicaset/canary.go:CalculateReplicaCountsForTrafficRoutedCanary()` - ignores these settings.
 
-- **File:** `utils/replicaset/canary.go`
-  - **Function:** `CalculateReplicaCountsForTrafficRoutedCanary()` (line 341)
-  - **Purpose:** Calculates replica counts for traffic-routed canary (ignores maxSurge/maxUnavailable)
-
-- **File:** `utils/replicaset/replicaset.go`
-  - **Function:** `MaxSurge()` (line 451)
-  - **Purpose:** Returns maxSurge value for rollout
+**Code Flow**:
+1. `rolloutCanary()` → `reconcileCanaryReplicaSets()`
+2. `reconcileNewReplicaSet()` → `NewRSNewReplicas()`
+3. Branches based on traffic routing presence
 
 ## Current Behavior
-The rollout controller uses different logic for calculating replica counts based on whether traffic routing is enabled:
 
-1. **Basic Canary (TrafficRouting == nil):**
-   - Uses `CalculateReplicaCountsForBasicCanary()`
-   - Respects `maxSurge` and `maxUnavailable` settings
-   - Calculates `maxReplicaCountAllowed = rolloutSpecReplica + maxSurge`
-   - Limits total replica count across all ReplicaSets
+**Basic Canary**: Uses `MaxSurge(rollout)` to limit total replica count.
 
-2. **Traffic-Routed Canary (TrafficRouting != nil):**
-   - Uses `CalculateReplicaCountsForTrafficRoutedCanary()`
-   - Ignores `maxSurge` and `maxUnavailable` settings
-   - Calculates replica counts based solely on traffic weights
-   - Can exceed total desired replicas + maxSurge
+**Traffic-Routed Canary**: Calculates replicas based solely on traffic weights, can exceed configured limits.
 
 ## Expected Behavior
-Traffic-routed canary deployments should also respect `maxSurge` and `maxUnavailable` settings to prevent excessive scaling that impacts cluster autoscaling.
 
-## Code Flow Analysis
-1. `rolloutCanary()` calls `reconcileCanaryReplicaSets()`
-2. `reconcileCanaryReplicaSets()` calls `reconcileNewReplicaSet()`
-3. `reconcileNewReplicaSet()` calls `NewRSNewReplicas()` to get target replica count
-4. `NewRSNewReplicas()` branches based on traffic routing:
-   - Basic canary: `CalculateReplicaCountsForBasicCanary()` → respects maxSurge
-   - Traffic-routed canary: `CalculateReplicaCountsForTrafficRoutedCanary()` → ignores maxSurge
+Traffic-routed canaries should respect maxSurge/maxUnavailable to prevent excessive scaling.
 
 ## Key Findings
-- **Root Cause:** `CalculateReplicaCountsForTrafficRoutedCanary()` does not implement maxSurge/maxUnavailable logic
-- **Impact:** Traffic-routed canaries can scale beyond configured limits
-- **Affected Scenarios:** Any canary rollout using traffic routing (Istio, ALB, SMI, etc.)
-- **Current Workaround:** None - users must choose between traffic routing and surge control</content>
-<parameter name="filePath">/Users/nebojsaprodana/dev/skyscanner/skyscanner-ghec/argo-rollouts/issue_analysis/argo_rollouts_ignores_maxsurge_maxunavailable_traffic_shifting/01_current_state_analysis.md
+
+- **Root Cause**: `CalculateReplicaCountsForTrafficRoutedCanary()` lacks maxSurge/maxUnavailable logic
+- **Impact**: Unbounded scaling potential in traffic-routed deployments
+- **Affected Scenarios**: All canary rollouts with traffic routing (Istio, ALB, SMI)
+
+## Manual Exploration Required
+
+**Investigate Further**:
+- Compare code implementations between basic and traffic-routed canary functions
+- Review test cases to confirm behavior differences
+- Examine how traffic weights drive scaling decisions
+- Test scaling behavior with different traffic routing providers
+
+**Key Question**: Why do the two canary implementations have different scaling logic?

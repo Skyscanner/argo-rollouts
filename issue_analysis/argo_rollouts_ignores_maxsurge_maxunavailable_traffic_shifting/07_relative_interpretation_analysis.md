@@ -163,3 +163,33 @@ func CalculateReplicaCountsForTrafficRoutedCanaryWithLimits(rollout *v1alpha1.Ro
 1. **Immediate:** Add validation warnings for unsupported settings
 2. **Short-term:** Implement absolute limits with traffic awareness
 3. **Long-term:** Evaluate relative interpretation if absolute insufficient
+
+# Relative maxSurge/maxUnavailable Interpretation
+
+## Source-Backed Facts
+
+### Current Implementation
+- **No relative interpretation exists**: Both basic and traffic-routed canaries use absolute interpretation of maxSurge/maxUnavailable
+- **Basic canary**: Limits apply to total rollout replicas (absolute interpretation)
+- **Traffic-routed canary**: Limits are completely ignored (no interpretation)
+
+### GitHub Issues Analysis
+- **No proposals for relative interpretation**: Issues #3284, #3539, #3397, #2239 request maxSurge/maxUnavailable support but do not propose relative interpretation
+- **Focus on absolute limits**: User requests center on respecting standard Kubernetes scaling limits in traffic-routed deployments
+
+### Code Evidence
+- `utils/replicaset/canary.go`: `CalculateReplicaCountsForBasicCanary` uses absolute limits
+- `utils/replicaset/canary.go`: `CalculateReplicaCountsForTrafficRoutedCanary` ignores limits entirely
+- No code implements relative interpretation of maxSurge/maxUnavailable
+
+## Manual Exploration Required
+
+### Technical Questions
+- How would relative interpretation work with step-by-step traffic weight changes?
+- What edge cases exist with rollbacks, aborts, and dynamic stable scaling?
+- How does relative interpretation compare to absolute limits in practice?
+
+### Design Questions
+- Should relative interpretation be considered if absolute limits prove insufficient?
+- What are the complexity trade-offs between relative and absolute approaches?
+- How do other systems handle scaling limits in traffic-based deployments?
