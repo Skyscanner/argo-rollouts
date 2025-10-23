@@ -1,112 +1,66 @@
-# Effort Estimation: Argo-rollouts ignores maxSurge and maxUnavailable when traffic shifting is used
+# Exploration Analysis: Argo-rollouts ignores maxSurge and maxUnavailable when traffic shifting is used
 
 ## Overview
 **Issue Type:** Design Philosophy Challenge (not a bug fix)  
-**Complexity:** High (requires maintainer consensus and potential design changes)  
-**Estimated Total Effort:** 4-8 weeks (highly variable based on community discussion)
+**Complexity:** High (requires maintainer consensus and potential design changes)
 
-## Effort Breakdown
+## Technical Considerations
 
-### Phase 1: Research & Community Engagement (2-3 weeks)
-**Effort:** 2-3 weeks  
-**Rationale:** Understanding maintainer rationale and building community consensus is the most time-consuming part. This involves:
-- Deep analysis of design decisions from issue #2239
-- Surveying multiple related issues (#3284, #3539, #3397)
-- Evaluating MinPodsPerReplicaSet effectiveness as current workaround
-- Analyzing dynamicStableScale impact on maxSurge/maxUnavailable feasibility
-- Assessing manual canary steps as alternative scaling control
+### Current Design Philosophy
+Traffic routing prioritizes traffic control over pod scaling limits. maxSurge/maxUnavailable are intentionally not supported to maintain traffic shifting priority.
 
-**Key Activities:**
-- Code archaeology to understand traffic routing design decisions
-- Community engagement and maintainer discussions
-- Analysis of MinPodsPerReplicaSet limitations
-- Assessment of whether maxSurge/maxUnavailable can be supported when dynamicStableScale is enabled
-- Documentation of manual workaround pain points
+### Key Technical Insights
+- **Critical Finding:** Implementation feasibility depends on `dynamicStableScale` setting
+- **Without dynamicStableScale:** maxSurge/maxUnavailable remain non-applicable (stable always fully scaled)
+- **With dynamicStableScale:** Both limits become technically feasible and meaningful
 
-### Phase 2: Design & Technical Approach (1-2 weeks, conditional)
-**Effort:** 1-2 weeks  
-**Rationale:** Only applicable if maintainers approve design change. Requires evaluating multiple approaches (absolute vs relative interpretation).
-
-**Key Activities:**
-- Design maxSurge integration that doesn't break traffic routing logic
+### Implementation Considerations
+- Maintain traffic shifting priority over scaling limits
+- Ensure rollback minimum availability logic still functions
+- Consider interaction with `minPodsPerReplicaSet`
+- Preserve dynamic stable scaling behavior
 - Evaluate relative percentage interpretation between canary steps
-- Compare absolute vs relative approaches for user needs
-- Risk assessment and mitigation planning
 
-### Phase 3: Implementation (2-3 weeks, conditional)
-**Effort:** 2-3 weeks  
-**Rationale:** Straightforward implementation once design is approved, but requires careful testing to avoid breaking traffic control logic.
+## Community and Design Factors
 
-**Key Activities:**
-- Modify `CalculateReplicaCountsForTrafficRoutedCanary()` function
-- Update rollback logic if needed
-- Add validation warning for unsupported maxSurge/maxUnavailable with traffic routing
-- Comprehensive testing
+### User Pain Points
+- "Very rapid infrastructure scaling" causing cost and resource problems
+- Need for scaling control in traffic-routed deployments
+- Manual canary steps as poor workaround for scaling control
 
-### Phase 4: Testing & Documentation (1-2 weeks, conditional)
-**Effort:** 1-2 weeks  
-**Rationale:** Standard testing and documentation effort, but conditional on implementation approval.
+### Current Workarounds
+- **MinPodsPerReplicaSet:** Provides minimum pod floor but doesn't control surge
+- **Manual Canary Steps:** Verbose and hard to maintain
+- **Documentation:** Limited guidance on scaling behavior
 
-**Key Activities:**
-- Add test coverage for maxSurge scenarios with traffic routing
-- Update documentation
-- Performance validation
+### Community Reception Assessment
+- **High Controversy:** Challenges fundamental traffic routing design decisions
+- **Strong User Demand:** Multiple issues (#3284, #3539, #3397) requesting functionality
+- **Maintainer Position:** Intentional design decision prioritizing traffic control
 
-### Phase 5: Alternative Solutions (1-2 weeks, if implementation rejected)
-**Effort:** 1-2 weeks  
-**Rationale:** If maintainers reject the design change, focus shifts to documentation and workarounds. This is now more likely given MinPodsPerReplicaSet provides some relief.
+## Exploration Directions
 
-**Key Activities:**
-- Improve `minPodsPerReplicaSet` documentation and best practices
-- Create infrastructure scaling best practices for traffic routing
-- Document manual canary step approaches with pros/cons
+### Design Philosophy Evaluation
+- Investigate whether current traffic routing design should be revisited
+- Assess community consensus on maxSurge/maxUnavailable support
+- Analyze dynamicStableScale impact on implementation feasibility
 
-## Risk Factors Affecting Effort
+### Technical Approaches
+- Examine relative percentage interpretation between canary steps
+- Compare absolute vs relative approaches for scaling limits
+- Evaluate integration with existing traffic control logic
 
-### High Probability Risks
-- **Maintainers reject design change:** If maintainers reject the design change, effort shifts to documentation (reduces total effort by 50-70%)
-- **MinPodsPerReplicaSet deemed sufficient:** Community may accept current workarounds, reducing need for changes
-- **Community divided on approach:** Extended discussions could add 2-4 weeks
+### Alternative Solutions
+- Enhance MinPodsPerReplicaSet documentation and best practices
+- Develop infrastructure scaling best practices for traffic routing
+- Improve guidance for manual canary step approaches
 
-### Medium Probability Risks
-- **Implementation Challenges:** Breaking traffic control logic during implementation
-- **Performance Impact:** Traffic shifting performance degradation
-- **Backward Compatibility:** Ensuring existing behavior isn't broken
+## Open Questions
+- Should the design philosophy be revisited to support maxSurge/maxUnavailable?
+- How does dynamicStableScale impact implementation feasibility?
+- What are the trade-offs between absolute and relative scaling interpretations?
+- Can MinPodsPerReplicaSet be enhanced to better address scaling concerns?
+- What validation and warnings should be provided for unsupported configurations?
 
-## Resource Requirements
-
-### Skills Needed
-- **Primary:** Go programming, Kubernetes concepts, Argo Rollouts architecture
-- **Secondary:** Community engagement, technical writing, RFC processes
-- **Tertiary:** Traffic routing systems (Istio, ALB, SMI)
-
-### Environment Requirements
-- Kubernetes cluster for testing
-- Access to Argo Rollouts development environment
-- Community forum access (GitHub, Slack)
-
-## Success Probability Assessment
-
-### Best Case Scenario (20% probability)
-- Maintainers open to design discussion
-- Community consensus reached quickly
-- Implementation approved and completed in 4-6 weeks
-
-### Most Likely Scenario (60% probability)
-- Extended community discussions (2-4 weeks)
-- Design change rejected, focus on documentation and MinPodsPerReplicaSet improvements
-- Total effort: 3-5 weeks
-
-### Worst Case Scenario (20% probability)
-- Maintainers strongly oppose design change
-- Community divided, no consensus reached
-- Effort limited to documentation improvements (1-2 weeks)
-
-## Recommendation
-**Proceed with Caution:** This issue challenges fundamental Argo Rollouts design decisions. Consider starting with community engagement before investing significant development effort. The most valuable contribution might be:
-
-1. **Immediate Impact:** Improve MinPodsPerReplicaSet documentation and best practices
-2. **Medium-term:** Add validation warnings when maxSurge/maxUnavailable are set with traffic routing
-3. **Long-term:** Pursue design change only if community consensus is achievable
-
-**Key Insight:** MinPodsPerReplicaSet provides some scaling control but doesn't address the core issue of rapid scaling between traffic weights. Manual canary steps are a poor workaround that highlights the real need for proper scaling controls.
+## Key Insight
+MinPodsPerReplicaSet provides some scaling control but doesn't address the core issue of rapid scaling between traffic weights. Manual canary steps highlight the real need for proper scaling controls in traffic-routed deployments.

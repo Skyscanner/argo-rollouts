@@ -3,19 +3,6 @@
 ## Epic Overview
 **Objective:** Address community demand for maxSurge/maxUnavailable support in traffic-routed canary deployments, despite this being an intentional design decision that prioritizes traffic control over scaling limits.
 
-**Success Criteria:**
-- [ ] Community consensus reached on whether to implement maxSurge/maxUnavailable for traffic routing
-- [ ] If approved: Traffic-routed canary deployments respect maxSurge and maxUnavailable settings
-- [ ] If approved: Scaling behavior consistent between basic and traffic-routed canary strategies
-- [ ] If not approved: Clear documentation of design decision and workarounds provided
-- [ ] User pain points around "rapid infrastructure scaling" addressed
-
-## Prerequisites
-- [ ] Understanding of Argo Rollouts traffic routing design philosophy
-- [ ] Familiarity with maxSurge/maxUnavailable Kubernetes concepts
-- [ ] Access to test cluster for validation
-- [ ] Community discussion and maintainer alignment
-
 ## Current Workarounds Analysis
 
 ### MinPodsPerReplicaSet as Partial Solution
@@ -47,7 +34,7 @@ func CheckMinPodsPerReplicaSet(rollout *v1alpha1.Rollout, count int32) int32 {
 steps:
 - setWeight: 5   # Small increment
 - pause: {duration: 60s}
-- setWeight: 10  # Another small increment  
+- setWeight: 10  # Another small increment
 - pause: {duration: 60s}
 # ... many more steps instead of smooth progression
 ```
@@ -58,111 +45,35 @@ steps:
 - Doesn't adapt to different traffic patterns
 - Manual process prone to errors
 
-## Epic Tasks
+## Possible Exploration Directions
 
-### Phase 1: Research & Community Engagement
-- [ ] **Task 1.1:** Analyze maintainer design rationale from issue #2239
-  - **Acceptance Criteria:** Document why maxSurge/maxUnavailable were intentionally excluded
-  - **Dependencies:** None
-  
-- [ ] **Task 1.2:** Survey existing issues (#3284, #3539, #3397) for user impact
-  - **Acceptance Criteria:** Quantify infrastructure scaling problems reported by users
-  - **Dependencies:** None
+### Design Philosophy Evaluation
+- Investigate whether the current traffic routing design philosophy should be revisited
+- Explore community consensus on maxSurge/maxUnavailable support
+- Assess the impact of dynamicStableScale on implementation feasibility
 
-- [ ] **Task 1.3:** Evaluate MinPodsPerReplicaSet effectiveness
-  - **Acceptance Criteria:** Assess if MinPodsPerReplicaSet adequately addresses scaling concerns
-  - **Dependencies:** None
+### Technical Implementation Approaches
+- Examine relative percentage interpretation between canary steps
+- Compare absolute vs relative approaches for scaling limits
+- Evaluate integration with existing traffic control logic
 
-- [ ] **Task 1.4:** **NEW:** Analyze dynamicStableScale impact on maxSurge/maxUnavailable feasibility
-  - **Acceptance Criteria:** Determine if maxSurge/maxUnavailable can be supported when dynamicStableScale is enabled
-  - **Dependencies:** None
+### Workaround Enhancement
+- Improve MinPodsPerReplicaSet documentation and best practices
+- Create infrastructure scaling best practices for traffic routing
+- Develop better guidance for manual canary step approaches
 
-- [ ] **Task 1.5:** Engage maintainers on design philosophy change
-  - **Acceptance Criteria:** Open discussion on whether design should be revisited
-  - **Dependencies:** Tasks 1.1, 1.2, 1.3, 1.4
+## Open Questions for Further Exploration
 
-### Phase 2: Design & Technical Approach (Conditional)
-- [ ] **Task 2.1:** Design maxSurge integration with traffic routing
-  - **Acceptance Criteria:** Define approach that doesn't break traffic control priorities
-  - **Dependencies:** Task 1.5 approval
-  
-- [ ] **Task 2.2:** Evaluate relative percentage interpretation
-  - **Acceptance Criteria:** Analyze making maxSurge/maxUnavailable relative to traffic weight changes between steps
-  - **Dependencies:** Task 2.1
-  
-- [ ] **Task 2.3:** Compare absolute vs relative approaches
-  - **Acceptance Criteria:** Determine if relative interpretation better addresses user needs than absolute limits
-  - **Dependencies:** Task 2.2
+- Should the design philosophy be revisited to support maxSurge/maxUnavailable?
+- How does dynamicStableScale impact implementation feasibility?
+- What are the trade-offs between absolute and relative scaling interpretations?
+- Can MinPodsPerReplicaSet be enhanced to better address scaling concerns?
+- What validation and warnings should be provided for unsupported configurations?
 
-- [ ] **Task 2.4:** Prototype implementation approach
-  - **Acceptance Criteria:** Working prototype showing chosen scaling limits with traffic routing
-  - **Dependencies:** Task 2.3
+## Success Criteria
+1. Clear understanding of whether maxSurge/maxUnavailable support is feasible and desirable
+2. Improved documentation and guidance for current workarounds
+3. Community consensus on design direction
+4. Enhanced user experience for scaling control in traffic-routed deployments
 
-### Phase 3: Implementation (Conditional)
-- [ ] **Task 3.1:** Modify `CalculateReplicaCountsForTrafficRoutedCanary()`
-  - **Acceptance Criteria:** Function respects maxSurge limits while maintaining traffic control
-  - **Dependencies:** Task 2.4
-  
-- [ ] **Task 3.2:** Update rollback logic if needed
-  - **Acceptance Criteria:** Ensure rollback minimum availability logic still works
-  - **Dependencies:** Task 3.1
-
-- [ ] **Task 3.3:** Add validation warning
-  - **Acceptance Criteria:** Clear validation message when maxSurge/maxUnavailable set with traffic routing
-  - **Dependencies:** Task 3.1
-
-### Phase 4: Testing & Documentation (Conditional)
-- [ ] **Task 4.1:** Add comprehensive test coverage
-  - **Acceptance Criteria:** Tests cover maxSurge scenarios with traffic routing
-  - **Dependencies:** Task 3.1
-  
-- [ ] **Task 4.2:** Document design decision and workarounds
-  - **Acceptance Criteria:** Clear documentation of current behavior and alternatives
-  - **Dependencies:** All previous tasks
-
-### Phase 5: Alternative Solutions (If Implementation Rejected)
-- [ ] **Task 5.1:** Improve `minPodsPerReplicaSet` documentation
-  - **Acceptance Criteria:** Better guidance on using traffic routing's scaling controls
-  - **Dependencies:** Task 1.5 rejection
-  
-- [ ] **Task 5.2:** Create infrastructure scaling best practices
-  - **Acceptance Criteria:** Recommendations for avoiding rapid scaling with traffic routing
-  - **Dependencies:** Task 5.1
-
-## Risk Assessment
-| Risk | Probability | Impact | Mitigation Strategy |
-|------|-------------|--------|-------------------|
-| Maintainers reject design change | High | High | Prepare alternative solutions and documentation |
-| Implementation breaks traffic control logic | Medium | High | Extensive testing, phased rollout |
-| Community divided on approach | Medium | Medium | Clear RFC process, community voting |
-| Performance impact on traffic shifting | Low | Medium | Benchmark tests, performance validation |
-| MinPodsPerReplicaSet deemed sufficient | Medium | Medium | Document effectiveness and limitations |
-
-## Technical Approach
-**Current Design Philosophy:** Traffic routing prioritizes traffic control over pod scaling limits. maxSurge/maxUnavailable are intentionally not supported.
-
-**Critical New Insight:** Implementation feasibility depends on `dynamicStableScale` setting:
-- **Without dynamicStableScale:** maxSurge/maxUnavailable remain non-applicable (stable always fully scaled)
-- **With dynamicStableScale:** Both limits become technically feasible and meaningful
-
-**Potential Implementation:** If approved, modify `CalculateReplicaCountsForTrafficRoutedCanary()` to conditionally apply maxSurge/maxUnavailable when dynamicStableScale is enabled.
-
-**Key Considerations:**
-1. Maintain traffic shifting priority over scaling limits
-2. Ensure rollback minimum availability logic still functions
-3. Consider interaction with `minPodsPerReplicaSet`
-4. Preserve dynamic stable scaling behavior
-5. Evaluate relative percentage interpretation between canary steps (see `07_relative_interpretation_analysis.md`)
-6. **NEW:** Implementation may only be viable when `dynamicStableScale=true`
-
-## Contribution Strategy
-**Upstream Reception:** High controversy - challenges fundamental traffic routing design decisions.
-
-**Communication Approach:**
-- Respect existing design decisions while presenting user pain points
-- Reference multiple community issues (#3284, #3539, #3397)
-- Highlight manual canary step workaround limitations
-- Propose incremental approach that doesn't break existing behavior
-- Be prepared for rejection and have alternative solutions ready
-
-**Timeline:** 4-8 weeks for discussion and consensus, plus 2-3 weeks implementation if approved
+This epic provides initial directions for exploration while leaving significant room for discovery, community discussion, and design iteration.
