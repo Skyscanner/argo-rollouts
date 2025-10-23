@@ -1,40 +1,49 @@
-# Contribution Epic: Support scaleDownDelaySeconds & fast rollbacks with canary strategy
+# Contribution Epic: scaleDownDelaySeconds & Fast Rollbacks
 
 ## Epic Overview
-This epic focuses on enabling fast rollback capabilities for canary deployments through `scaleDownDelaySeconds` support. The primary goal is to provide feature parity with blue-green deployments for rollback scenarios.
 
-## Possible Exploration Directions
+**Problem**: 30-second scaleDownDelaySeconds defaults insufficient for production rollback scenarios.
+
+**Solution Focus**: Chart value optimization rather than major code changes.
+
+## Exploration Directions
 
 ### Chart Value Optimization
-- Investigate updating Helm chart defaults for production environments
-- Explore environment-specific configuration recommendations
-- Consider how existing rollback mechanisms could be better utilized with appropriate timing
-- Examine the trade-offs between fast rollbacks and resource efficiency
+- Update Helm chart defaults for production environments (300-600s delays)
+- Provide environment-specific configuration recommendations
+- Document rollback window best practices
 
-### Upstream Enhancement Opportunities
-- Look into optimizing analysis run termination speed
-- Explore improvements to canary pause step skipping during rollbacks
-- Consider enhancements to resource cleanup during extended delays
-- Investigate better integration between rollback logic and pause mechanisms
+### Optional Upstream Enhancements
+- Optimize analysis run termination speed (current: 20-30+ seconds)
+- Improve canary pause step skipping during rollbacks
+- Enhance resource cleanup during extended delays
 
 ### Configuration Strategy
-- Think about how to provide sensible defaults for different environments
-- Consider validation approaches for rollback window configurations
-- Explore documentation approaches for rollback scenarios
+- Provide sensible defaults for dev/staging/production
+- Add validation for rollback window configurations
+- Create production-ready configuration examples
 
-## Open Questions for Further Exploration
+## Open Questions
 
-- What are the appropriate default values for different deployment environments?
-- How do rollback windows interact with different types of analysis runs?
-- What are the performance implications of different scale down delay settings?
-- How can we balance rollback speed with resource efficiency?
-- What validation is needed for rollback window configurations?
+- What delay values work for different team sizes?
+- How do rollback windows interact with analysis runs?
+- What are performance implications of extended delays?
+- How to balance rollback speed with resource efficiency?
 
 ## Success Criteria
-1. Enable fast rollbacks for canary deployments through appropriate configuration
-2. Provide clear guidance for production rollback scenarios
-3. Maintain compatibility with existing rollback window mechanisms
-4. Support environment-specific configuration needs
 
-This epic provides initial directions for exploration while leaving significant room for discovery, configuration optimization, and community input during implementation.
+1. Enable reliable rollbacks through appropriate configuration
+2. Provide clear production guidance and examples
+3. Maintain compatibility with existing mechanisms
+4. Support environment-specific needs
+
+## Manual Exploration Required
+
+**Investigate Further**:
+- Test different delay values in staging environments
+- Analyze rollback window behavior with various revision counts
+- Measure analysis run termination performance
+- Document production configuration patterns
+
+**Key Question**: What configuration provides optimal rollback reliability for different deployment scales?
 
