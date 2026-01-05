@@ -339,6 +339,20 @@ type CanaryStrategy struct {
 	// Defaults to 100% of total replicas.
 	// +optional
 	ReplicaProgressThreshold *ReplicaProgressThreshold `json:"replicaProgressThreshold,omitempty" protobuf:"bytes,17,opt,name=replicaProgressThreshold"`
+
+	// PrewarmNextStep enables pre-provisioning of pods for the next canary step in parallel with the current step
+	// to speed up rollout transitions. When enabled, the controller will calculate the pod requirements for the
+	// next step and scale up those pods while the current step is still executing.
+	//
+	// MaxSurge behavior:
+	// - For basic canary (no traffic routing): Pre-warming respects maxSurge limits
+	// - For traffic-routed canary: Pre-warming allows natural surge (consistent with normal traffic-routed behavior)
+	//
+	// Note: This feature is disabled when DynamicStableScale is enabled, as pre-warming would have to aggressively
+	// scale down stable pods before traffic shifts, reducing rollback capacity.
+	// Default: false (disabled)
+	// +optional
+	PrewarmNextStep bool `json:"prewarmNextStep,omitempty" protobuf:"varint,18,opt,name=prewarmNextStep"`
 }
 
 // PingPongSpec holds the ping and pong service name.
@@ -1044,6 +1058,9 @@ type CanaryStatus struct {
 	StablePingPong PingPongType `json:"stablePingPong,omitempty" protobuf:"bytes,5,opt,name=stablePingPong"`
 	// StepPluginStatuses holds the status of the step plugins executed
 	StepPluginStatuses []StepPluginStatus `json:"stepPluginStatuses,omitempty" protobuf:"bytes,6,rep,name=stepPluginStatuses"`
+	// PrewarmedReplicas tracks the number of replicas that have been pre-provisioned for the next step
+	// +optional
+	PrewarmedReplicas *int32 `json:"prewarmedReplicas,omitempty" protobuf:"varint,7,opt,name=prewarmedReplicas"`
 }
 
 type PingPongType string

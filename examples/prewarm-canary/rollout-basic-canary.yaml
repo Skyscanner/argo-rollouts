@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollout-prewarm-basic-canary
+spec:
+  replicas: 10
+  strategy:
+    canary:
+      # Enable pre-warming for basic canary (without traffic routing)
+      prewarmNextStep: true
+
+      # For basic canary, pre-warming is less impactful since pods immediately serve traffic
+      # based on their replica count, but still speeds up step transitions
+
+      # Configure maxSurge to allow pre-warming
+      maxSurge: "30%"  # Allows up to 3 extra pods
+      maxUnavailable: 1
+
+      # Canary steps - replica count determines traffic distribution
+      steps:
+        - setWeight: 20  # Step 0: 20% traffic (2 canary, 8 stable)
+        - pause: { duration: 2m }
+
+        - setWeight: 40  # Step 2: 40% traffic (4 canary, 6 stable)
+                         # While on step 0, pre-warms canary to 4 pods
+        - pause: { duration: 2m }
+
+        - setWeight: 60  # Step 4: 60% traffic (6 canary, 4 stable)
+                         # While on step 2, pre-warms canary to 6 pods
+        - pause: { duration: 5m }
+
+        - setWeight: 80  # Step 6: 80% traffic (8 canary, 2 stable)
+                         # While on step 4, pre-warms canary to 8 pods
+        - pause: { duration: 5m }
+
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollout-prewarm-basic
+  template:
+    metadata:
+      labels:
+        app: rollout-prewarm-basic
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:blue
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              memory: 32Mi
+              cpu: 5m
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollout-prewarm-basic
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollout-prewarm-basic

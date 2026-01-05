@@ -412,6 +412,51 @@ func CalculateReplicaCountsForTrafficRoutedCanary(rollout *v1alpha1.Rollout, new
 	return CheckMinPodsPerReplicaSet(rollout, canaryCount), CheckMinPodsPerReplicaSet(rollout, stableCount)
 }
 
+
+// CalculateNextStepReplicaCounts calculates the desired replica counts for the next canary step
+// to enable pre-warming of pods. Returns (nextCanaryCount, nextStableCount, hasNextStep).
+// If there is no next step or only pause steps remain, returns hasNextStep=false.
+func CalculateNextStepReplicaCounts(ro *v1alpha1.Rollout, newRS, stableRS *appsv1.ReplicaSet, weights *v1alpha1.TrafficWeights) (int32, int32, bool) {
+	currentStep, currentStepIndex := GetCurrentCanaryStep(ro)
+	if currentStep == nil {
+		return 0, 0, false
+	}
+
+	// Check if there's a next step
+	if int(*currentStepIndex) >= len(ro.Spec.Strategy.Canary.Steps)-1 {
+		return 0, 0, false
+	}
+
+	nextStepIndex := *currentStepIndex + 1
+	nextStep := ro.Spec.Strategy.Canary.Steps[nextStepIndex]
+
+	// Skip pause steps - look ahead to first non-pause step
+	for nextStep.Pause != nil && int(nextStepIndex) < len(ro.Spec.Strategy.Canary.Steps)-1 {
+		nextStepIndex++
+		nextStep = ro.Spec.Strategy.Canary.Steps[nextStepIndex]
+	}
+
+	// If we only found pause steps, no pre-warming needed
+	if nextStep.Pause != nil {
+		return 0, 0, false
+	}
+
+	// Create a temporary rollout with next step settings
+	tempRollout := ro.DeepCopy()
+	tempRollout.Status.CurrentStepIndex = &nextStepIndex
+
+	var nextCanaryCount, nextStableCount int32
+	if ro.Spec.Strategy.Canary.TrafficRouting == nil {
+		// Basic canary
+		nextCanaryCount, nextStableCount = CalculateReplicaCountsForBasicCanary(tempRollout, newRS, stableRS, nil)
+	} else {
+		// Traffic-routed canary
+		nextCanaryCount, nextStableCount = CalculateReplicaCountsForTrafficRoutedCanary(tempRollout, newRS, stableRS, weights)
+	}
+
+	return nextCanaryCount, nextStableCount, true
+}
+
 // trafficWeightToReplicas returns the appropriate replicas given the full spec.replicas and a weight
 // Rounds up if not evenly divisible.
 func trafficWeightToReplicas(replicas, weight, maxWeight int32) int32 {

@@ -1,0 +1,102 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollout-prewarm-traffic-routing
+spec:
+  replicas: 10
+  strategy:
+    canary:
+      # Enable pre-warming of pods for next canary step
+      prewarmNextStep: true
+
+      # Traffic routing configuration (required for pre-warming to be most effective)
+      trafficRouting:
+        istio:
+          virtualService:
+            name: rollout-vsvc
+            routes:
+              - primary
+
+      # Keep DynamicStableScale disabled (default: false)
+      # Pre-warming is automatically disabled when dynamicStableScale: true
+      # to avoid aggressively scaling down stable pods before traffic shifts
+      dynamicStableScale: false
+
+      # Configure maxSurge to allow pre-warming
+      # Pre-warmed pods will use available surge capacity
+      maxSurge: "50%"  # Allows up to 5 extra pods (10 * 50% = 5)
+      maxUnavailable: 0
+
+      # Canary steps with gradual traffic increase
+      steps:
+        - setWeight: 10  # Step 0: 10% traffic (1 pod)
+        - pause: { duration: 2m }
+
+        - setWeight: 25  # Step 2: 25% traffic (3 pods)
+                         # While on step 0, pre-warms 2 extra pods
+        - pause: { duration: 2m }
+
+        - setWeight: 50  # Step 4: 50% traffic (5 pods)
+                         # While on step 2, pre-warms 2 more pods
+        - pause: { duration: 5m }
+
+        - setWeight: 75  # Step 6: 75% traffic (8 pods)
+                         # While on step 4, pre-warms 3 more pods
+        - pause: { duration: 5m }
+
+        # Final step promotes to 100%
+
+      # Optional: Stable and canary services
+      stableService: rollout-stable
+      canaryService: rollout-canary
+
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rollout-prewarm
+  template:
+    metadata:
+      labels:
+        app: rollout-prewarm
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:blue
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              memory: 32Mi
+              cpu: 5m
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollout-stable
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollout-prewarm
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollout-canary
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollout-prewarm
