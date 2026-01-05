@@ -2,6 +2,7 @@ package rollout
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -428,6 +429,12 @@ func (c *rolloutContext) syncRolloutStatusCanary() error {
 	}
 
 	if c.completedCurrentCanaryStep() {
+		// When step completes and we had pre-warming active, reset the pre-warmed counter
+		// since we're transitioning to the pre-warmed next step
+		if c.rollout.Status.Canary.PrewarmedReplicas != nil && *c.rollout.Status.Canary.PrewarmedReplicas > 0 {
+			c.log.Infof("Current step completed, transitioning to pre-warmed next step")
+			newStatus.Canary.PrewarmedReplicas = ptr.To[int32](0)
+		}
 		stepStr := rolloututil.CanaryStepString(*currentStep)
 		*currentStepIndex++
 		newStatus.Canary.CurrentStepAnalysisRunStatus = nil
@@ -446,6 +453,24 @@ func (c *rolloutContext) reconcileCanaryReplicaSets() (bool, error) {
 		c.log.Infof("Skipping canary/stable ReplicaSet reconciliation: %s", haltReason)
 		return false, nil
 	}
+
+	// Handle pre-warming logic
+	if c.shouldPrewarmNextStep() {
+		scaled, err := c.reconcilePrewarmedReplicas()
+		if err != nil {
+			return false, err
+		}
+		if scaled {
+			c.log.Infof("Scaled pre-warmed replicas for next step")
+			// Continue to reconcile current step as well
+		}
+	} else if c.rollout.Status.Canary.PrewarmedReplicas != nil && *c.rollout.Status.Canary.PrewarmedReplicas > 0 {
+		// Pre-warming was previously active but should be disabled now (abort/rollback)
+		// Clean up pre-warmed replicas
+		c.log.Infof("Cleaning up pre-warmed replicas due to rollback/abort")
+		c.newStatus.Canary.PrewarmedReplicas = ptr.To[int32](0)
+	}
+
 	err := c.removeScaleDownDeadlines()
 	if err != nil {
 		return false, err
@@ -478,3 +503,145 @@ func (c *rolloutContext) reconcileCanaryReplicaSets() (bool, error) {
 	}
 	return false, nil
 }
+
+// shouldPrewarmNextStep determines if pre-warming should be active
+func (c *rolloutContext) shouldPrewarmNextStep() bool {
+	// Don't pre-warm if feature is disabled
+	if c.rollout.Spec.Strategy.Canary == nil || !c.rollout.Spec.Strategy.Canary.PrewarmNextStep {
+		return false
+	}
+
+	// Don't pre-warm with DynamicStableScale - would aggressively scale down stable pods
+	// before traffic shifts, reducing rollback capacity
+	if c.rollout.Spec.Strategy.Canary.TrafficRouting != nil &&
+		c.rollout.Spec.Strategy.Canary.DynamicStableScale {
+		return false
+	}
+
+	// Don't pre-warm if paused
+	if c.rollout.Spec.Paused {
+		return false
+	}
+
+	// Don't pre-warm during abort/rollback
+	if c.rollout.Status.Abort {
+		return false
+	}
+
+	// Don't pre-warm if no current step or completed all steps
+	currentStep, _ := replicasetutil.GetCurrentCanaryStep(c.rollout)
+	if currentStep == nil {
+		return false
+	}
+
+	// Only pre-warm when current step requirements are met
+	// This prevents interference with current step scaling
+	if !replicasetutil.AtDesiredReplicaCountsForCanary(c.rollout, c.newRS, c.stableRS, c.otherRSs, c.newStatus.Canary.Weights) {
+		return false
+	}
+
+	return true
+}
+
+// reconcilePrewarmedReplicas handles pre-warming of next step replicas
+func (c *rolloutContext) reconcilePrewarmedReplicas() (bool, error) {
+	nextCanaryCount, nextStableCount, hasNextStep := replicasetutil.CalculateNextStepReplicaCounts(
+		c.rollout, c.newRS, c.stableRS, c.newStatus.Canary.Weights)
+
+	if !hasNextStep {
+		c.log.Infof("No next step to pre-warm")
+		return false, nil
+	}
+
+	// Calculate current requirements
+	var currentCanaryCount, currentStableCount int32
+	if c.rollout.Spec.Strategy.Canary.TrafficRouting == nil {
+		currentCanaryCount, currentStableCount = replicasetutil.CalculateReplicaCountsForBasicCanary(
+			c.rollout, c.newRS, c.stableRS, c.otherRSs)
+	} else {
+		currentCanaryCount, currentStableCount = replicasetutil.CalculateReplicaCountsForTrafficRoutedCanary(
+			c.rollout, c.newRS, c.stableRS, c.newStatus.Canary.Weights)
+	}
+
+	// Determine additional replicas needed for next step
+	additionalCanary := int32(0)
+	if nextCanaryCount > currentCanaryCount {
+		additionalCanary = nextCanaryCount - currentCanaryCount
+	}
+
+	additionalStable := int32(0)
+	if nextStableCount > currentStableCount {
+		additionalStable = nextStableCount - currentStableCount
+	}
+
+	if additionalCanary == 0 && additionalStable == 0 {
+		c.log.Infof("Next step requires same or fewer replicas, no pre-warming needed")
+		c.newStatus.Canary.PrewarmedReplicas = ptr.To[int32](0)
+		return false, nil
+	}
+
+	// Track total pre-warm count for status update
+	totalPrewarm := additionalCanary + additionalStable
+
+	// For basic canary (no traffic routing), respect maxSurge constraints
+	// For traffic-routed canary, allow natural surge (consistent with normal progression)
+	if c.rollout.Spec.Strategy.Canary.TrafficRouting == nil {
+		// Check maxSurge constraints for basic canary
+		maxSurge := replicasetutil.MaxSurge(c.rollout)
+		rolloutReplicas := defaults.GetReplicasOrDefault(c.rollout.Spec.Replicas)
+		totalCurrentReplicas := replicasetutil.GetReplicaCountForReplicaSets(c.allRSs)
+		availableSurge := (rolloutReplicas + maxSurge) - totalCurrentReplicas
+
+		if availableSurge <= 0 {
+			c.log.Infof("No surge capacity available for pre-warming")
+			c.newStatus.Canary.PrewarmedReplicas = ptr.To[int32](0)
+			return false, nil
+		}
+
+		// Pre-warm up to available surge capacity
+		if totalPrewarm > availableSurge {
+			// Scale proportionally
+			ratio := float64(availableSurge) / float64(totalPrewarm)
+			originalTotal := totalPrewarm
+			additionalCanary = int32(math.Floor(float64(additionalCanary) * ratio))
+			additionalStable = availableSurge - additionalCanary
+			totalPrewarm = additionalCanary + additionalStable
+			c.log.Infof("Pre-warming limited by maxSurge: scaling %d replicas (reduced from %d)",
+				totalPrewarm, originalTotal)
+		}
+	}
+	// For traffic-routed canary: no maxSurge enforcement, allow full pre-warming
+
+	// Scale up the ReplicaSets
+	scaled := false
+
+	if additionalCanary > 0 && c.newRS != nil {
+		targetCanary := currentCanaryCount + additionalCanary
+		if *c.newRS.Spec.Replicas < targetCanary {
+			c.log.Infof("Pre-warming canary RS from %d to %d", *c.newRS.Spec.Replicas, targetCanary)
+			_, _, err := c.scaleReplicaSetAndRecordEvent(c.newRS, targetCanary)
+			if err != nil {
+				return false, err
+			}
+			scaled = true
+		}
+	}
+
+	if additionalStable > 0 && c.stableRS != nil && c.stableRS.Name != c.newRS.Name {
+		targetStable := currentStableCount + additionalStable
+		if *c.stableRS.Spec.Replicas < targetStable {
+			c.log.Infof("Pre-warming stable RS from %d to %d", *c.stableRS.Spec.Replicas, targetStable)
+			_, _, err := c.scaleReplicaSetAndRecordEvent(c.stableRS, targetStable)
+			if err != nil {
+				return false, err
+			}
+			scaled = true
+		}
+	}
+
+	// Update status
+	c.newStatus.Canary.PrewarmedReplicas = ptr.To[int32](totalPrewarm)
+
+	return scaled, nil
+}
+

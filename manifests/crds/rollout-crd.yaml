@@ -444,6 +444,8 @@ spec:
                         - pingService
                         - pongService
                         type: object
+                      prewarmNextStep:
+                        type: boolean
                       replicaProgressThreshold:
                         properties:
                           type:
@@ -4116,6 +4118,9 @@ spec:
                     - name
                     - status
                     type: object
+                  prewarmedReplicas:
+                    format: int32
+                    type: integer
                   stablePingPong:
                     type: string
                   stepPluginStatuses:

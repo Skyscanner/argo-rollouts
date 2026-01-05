@@ -1881,3 +1881,262 @@ func TestAllReplicaProgressThresholdMet(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateNextStepReplicaCounts(t *testing.T) {
+	tests := []struct {
+		name                string
+		rollout             *v1alpha1.Rollout
+		newRS               *appsv1.ReplicaSet
+		stableRS            *appsv1.ReplicaSet
+		weights             *v1alpha1.TrafficWeights
+		expectedCanary      int32
+		expectedStable      int32
+		expectedHasNextStep bool
+	}{
+		{
+			name: "basic canary - next step increases weight",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](20)}, // Current step
+								{SetWeight: ptr.To[int32](50)}, // Next step
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 2, 2),
+			stableRS:            newRS("stable", 8, 8),
+			expectedCanary:      4, // 50% would be 5, but limited by maxSurge (10 + 2 max - 10 current = 2 available, distributed)
+			expectedStable:      8, // Remaining after surge constraint
+			expectedHasNextStep: true,
+		},
+		{
+			name: "traffic-routed canary - next step increases weight",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](10)}, // Current step
+								{SetWeight: ptr.To[int32](25)}, // Next step
+							},
+							TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+								Istio: &v1alpha1.IstioTrafficRouting{},
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 1, 1),
+			stableRS:            newRS("stable", 10, 10),
+			expectedCanary:      3,  // 25% of 10 (rounded up from 2.5)
+			expectedStable:      10, // Stable stays at 100% (no dynamic scaling)
+			expectedHasNextStep: true,
+		},
+		{
+			name: "last step - no next step",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](50)}, // Current step (last step)
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 5, 5),
+			stableRS:            newRS("stable", 5, 5),
+			expectedCanary:      0,
+			expectedStable:      0,
+			expectedHasNextStep: false,
+		},
+		{
+			name: "skip pause steps",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](20)},           // Current step
+								{Pause: &v1alpha1.RolloutPause{}},        // Next step is pause
+								{Pause: &v1alpha1.RolloutPause{}},        // Another pause
+								{SetWeight: ptr.To[int32](60)},           // Should look ahead to this
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 2, 2),
+			stableRS:            newRS("stable", 8, 8),
+			expectedCanary:      6, // 60% of 10
+			expectedStable:      8, // Basic canary algorithm keeps stable at current level
+			expectedHasNextStep: true,
+		},
+		{
+			name: "only pause steps remaining",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](50)},    // Current step
+								{Pause: &v1alpha1.RolloutPause{}}, // Only pause remaining
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 5, 5),
+			stableRS:            newRS("stable", 5, 5),
+			expectedCanary:      0,
+			expectedStable:      0,
+			expectedHasNextStep: false,
+		},
+		{
+			name: "setCanaryScale explicit replicas",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](20)}, // Current step
+								{SetCanaryScale: &v1alpha1.SetCanaryScale{Replicas: ptr.To[int32](5)}}, // Next step with explicit replicas (within maxSurge)
+							},
+							TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+								Istio: &v1alpha1.IstioTrafficRouting{},
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 2, 2),
+			stableRS:            newRS("stable", 10, 10),
+			expectedCanary:      5,  // Explicit replica count (capped at maxSurge)
+			expectedStable:      10, // Stable stays at 100%
+			expectedHasNextStep: true,
+		},
+		{
+			name: "no current step",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](50)},
+							},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: nil, // No current step
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 5, 5),
+			stableRS:            newRS("stable", 5, 5),
+			expectedCanary:      0,
+			expectedStable:      0,
+			expectedHasNextStep: false,
+		},
+		{
+			name: "traffic-routed with minPodsPerReplicaSet",
+			rollout: &v1alpha1.Rollout{
+				Spec: v1alpha1.RolloutSpec{
+					Replicas: ptr.To[int32](10),
+					Strategy: v1alpha1.RolloutStrategy{
+						Canary: &v1alpha1.CanaryStrategy{
+							Steps: []v1alpha1.CanaryStep{
+								{SetWeight: ptr.To[int32](5)},  // Current step - would be 0.5 pods
+								{SetWeight: ptr.To[int32](15)}, // Next step - would be 1.5 pods
+							},
+							TrafficRouting: &v1alpha1.RolloutTrafficRouting{
+								Istio: &v1alpha1.IstioTrafficRouting{},
+							},
+							MinPodsPerReplicaSet: ptr.To[int32](2), // Minimum 2 pods
+							MaxSurge:             &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+							MaxUnavailable:       &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+						},
+					},
+				},
+				Status: v1alpha1.RolloutStatus{
+					CurrentStepIndex: ptr.To[int32](0),
+					StableRS:         "stable",
+					CurrentPodHash:   "new",
+				},
+			},
+			newRS:               newRS("new", 2, 2), // Would be 1 but min is 2
+			stableRS:            newRS("stable", 10, 10),
+			expectedCanary:      2,  // 15% of 10 = 2 (rounded up from 1.5, but also meets min)
+			expectedStable:      10, // Stable stays at 100%
+			expectedHasNextStep: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			canaryCount, stableCount, hasNextStep := CalculateNextStepReplicaCounts(tt.rollout, tt.newRS, tt.stableRS, tt.weights)
+			assert.Equal(t, tt.expectedHasNextStep, hasNextStep, "hasNextStep mismatch")
+			if hasNextStep {
+				assert.Equal(t, tt.expectedCanary, canaryCount, "canary replica count mismatch")
+				assert.Equal(t, tt.expectedStable, stableCount, "stable replica count mismatch")
+			}
+		})
+	}
+}

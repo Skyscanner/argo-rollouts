@@ -1,0 +1,108 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: rollout-prewarm-alb
+spec:
+  replicas: 20
+  strategy:
+    canary:
+      # Enable pre-warming for ALB-based traffic routing
+      prewarmNextStep: true
+
+      # ALB traffic routing configuration
+      trafficRouting:
+        alb:
+          ingress: rollout-ingress
+          servicePort: 80
+
+      # Higher surge for faster rollouts with more replicas
+      maxSurge: "40%"  # Allows up to 8 extra pods (20 * 40% = 8)
+      maxUnavailable: 0
+
+      # Aggressive canary steps with pre-warming
+      steps:
+        - setWeight: 5   # Step 0: 5% traffic (1 pod)
+        - pause: { duration: 1m }
+
+        - setWeight: 10  # Step 2: 10% traffic (2 pods)
+                         # Pre-warms 1 extra pod
+        - pause: { duration: 1m }
+
+        - setWeight: 20  # Step 4: 20% traffic (4 pods)
+                         # Pre-warms 2 extra pods
+        - pause: { duration: 2m }
+
+        - setWeight: 40  # Step 6: 40% traffic (8 pods)
+                         # Pre-warms 4 extra pods
+        - pause: { duration: 5m }
+
+        - setWeight: 60  # Step 8: 60% traffic (12 pods)
+                         # Pre-warms 4 extra pods
+        - pause: { duration: 5m }
+
+        - setWeight: 80  # Step 10: 80% traffic (16 pods)
+                         # Pre-warms 4 extra pods
+        - pause: { duration: 10m }
+
+      # Optional: Analysis for automated promotion
+      analysis:
+        templates:
+          - templateName: success-rate
+        startingStep: 2  # Start analysis from step 2
+
+      stableService: rollout-alb-stable
+      canaryService: rollout-alb-canary
+
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: rollout-prewarm-alb
+  template:
+    metadata:
+      labels:
+        app: rollout-prewarm-alb
+    spec:
+      containers:
+        - name: rollouts-demo
+          image: argoproj/rollouts-demo:blue
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 10m
+            limits:
+              memory: 128Mi
+              cpu: 100m
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollout-alb-stable
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollout-prewarm-alb
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollout-alb-canary
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: rollout-prewarm-alb
